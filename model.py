@@ -54,8 +54,9 @@ def build_backbone(cfg, device):
         net.load_state_dict(net_state_dict)
 
     net = net.features.to(device).eval() # freeze parameter, only use the feature part not classifier part 
-    for param in net.parameters():
+    for param in net.parameters(): # set require grad to be false to save memory when capturing content and style 
         param.requires_grad = False
+
     # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
     # TODO not sure if gradient will be backprop to image layer, need to check neural-style imlementation 
 
@@ -65,7 +66,6 @@ def build_backbone(cfg, device):
 
     assert(net.training == False)
     assert(len(net) == len(layer_list))
-    
 
     return net, layer_list
 
@@ -75,7 +75,7 @@ class ContentLoss(nn.Module):
         self.weight = content_weight
         self.criterian = nn.MSELoss()
         self.mask = layer_mask.clone()
-        self.target = None # store corresponding style image  
+        self.target = None # Store the original naive stich image's feature map 
         self.mode = 'None'
         self.loss = None 
     
@@ -85,13 +85,28 @@ class ContentLoss(nn.Module):
             self.target = input.detach()
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.target) * self.weight
+        else:
+            # If None, do nothing 
         return input
 
 class StyleLossPass1(nn.Module):
-    def __init__(self):
+    def __init__(self, style_weight, layer_mask):
         super(StyleLossPass1, self).__init__()
-    def forward():
-        return None
+        self.weight = style_weight
+        self.critertain = None # Should be gramm matric 
+        self.mask = layer_mask.clone()
+        self.target = None # Store the styled image's feature map 
+        self.mode = 'None'
+        self.loss = None 
+
+    def forward(self, input):
+        if self.mode == 'capture':
+            self.target = input.detach()
+        elif self.mode == 'loss':
+            self.loss = self.critertain(input, self.target, self.mask)
+        else:
+           # If None, do nothing 
+        return input
 
 class StyleLossPass2(nn.Module):
     def __init__(self):

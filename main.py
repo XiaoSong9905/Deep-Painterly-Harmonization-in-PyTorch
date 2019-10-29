@@ -65,14 +65,12 @@ def main():
     style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg,name='read_style_img.png')
     tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,name='read_tight_mask.png')
     loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,name='read_loss_mask.png')
-    style_img = nn.Parameter(style_img)
-    assert(style_img.requires_grad==True)
 
     # Setup Network 
     content_layers = cfg.content_layers.split(',')
     style_layers = cfg.style_layers.split(',')
-    content_loss = []
-    style_loss = []
+    content_loss_list = []
+    style_loss_list = []
     tv_loss = []
 
     # Build backbone 
@@ -116,20 +114,45 @@ def main():
             print('add content layer at {}'.format(str(len(net))))
             content_layer_loss = ContentLoss(cfg.content_weight, mask)
             net.add_module(str(len(net)), content_layer_loss)
-            content_loss.append(content_layer_loss)
-            
+            content_loss_list.append(content_layer_loss)
+
         if layer_list[i] in style_layers:
             print('add style layer at {}'.format(str(len(net))))
             # TODO style loss need more operation 
             style_layer_loss = StyleLossPass1()
             net.add_module(str(len(net)), style_layer_loss)
-            style_loss.append(style_layer_loss)
+            style_loss_list.append(style_layer_loss)
     
     if cfg.debug_mode:
         print('===>build net')
         print('net is', net)
 
+    # Go pass the net to capture information we need 
+    for i in content_loss_list:
+        i.mode = 'capture'
+    net(native_img)
 
+    for i in content_loss_list:
+        i.mode = 'None'
+
+    for i in style_loss_list:
+        i.mode = 'capture'
+    net(style_img)
+
+    for i in content_layer_loss:
+        i.mode = 'loss'
+    
+    for i in style_layer_loss:
+        i.mode = 'loss'
+
+    for param in net.parameters(): # freeze new added loss layer 
+        param.requires_grad = False
+
+    # Set image to be bp 
+    native_img = nn.Parameter(native_img)
+    assert(native_img.requires_grad==True)
+
+    
 
 if __name__ == '__main__':
     main()

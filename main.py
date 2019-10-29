@@ -119,6 +119,8 @@ def main():
         if layer_list[i] in style_layers:
             print('add style layer at {}'.format(str(len(net))))
             # TODO style loss need more operation 
+            # Match operation should be done at this stage, future forward backward only do the update 
+            # See neural_gram.lua line 120 - 136 
             style_layer_loss = StyleLossPass1()
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
@@ -152,7 +154,7 @@ def main():
     native_img = nn.Parameter(native_img)
     assert(native_img.requires_grad==True)
 
-    
+
 
 if __name__ == '__main__':
     main()

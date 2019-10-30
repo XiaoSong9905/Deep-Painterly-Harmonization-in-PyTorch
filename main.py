@@ -50,6 +50,7 @@ parser.add_argument("-tv_weight", type=float, default=1e-3)
 parser.add_argument("-init", choices=['random', 'image'], default='image')
 parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default=None)
 parser.add_argument("-model", choices=['vgg16', 'vgg19', 'resnet18', 'resnet34'], default='vgg16')
+parser.add_argument("-match_patch_size", type=int, default=3)
 
 # Other option 
 parser.add_argument("-debug_mode", type=bool, default=True)
@@ -81,6 +82,9 @@ def main():
     net = nn.Sequential()
     mask = loss_mask
 
+    if cfg.debug_mode:
+        print('===>build net with loss module')
+
     for i, layer in enumerate(list(cnn)):
         # Add Backbone Layer 
         # If cnn backbone have other module, add other module in this stage         
@@ -111,46 +115,57 @@ def main():
 
         # Add Loss layer 
         if layer_list[i] in content_layers:
-            print('add content layer at {}'.format(str(len(net))))
+            print('add content layer at net position {}'.format(str(len(net))))
             content_layer_loss = ContentLoss(cfg.content_weight, mask)
             net.add_module(str(len(net)), content_layer_loss)
             content_loss_list.append(content_layer_loss)
 
         if layer_list[i] in style_layers:
-            print('add style layer at {}'.format(str(len(net))))
+            print('add style layer at net position {}'.format(str(len(net))))
             # TODO style loss need more operation 
             # Match operation should be done at this stage, future forward backward only do the update 
             # See neural_gram.lua line 120 - 136 
-            style_layer_loss = StyleLossPass1()
+            style_layer_loss = StyleLossPass1(cfg.style_weight, mask, cfg.match_patch_size)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
     
+    del cnn # delet unused net to save memory 
+
     if cfg.debug_mode:
         print('===>build net')
         print('net is', net)
-
+    import pdb; pdb.set_trace()
     # Go pass the net to capture information we need 
     for i in content_loss_list:
         i.mode = 'capture'
+    for i in style_loss_list:
+        i.mode = 'capture_content'
     net(native_img)
 
+    import pdb; pdb.set_trace()
     for i in content_loss_list:
         i.mode = 'None'
-
     for i in style_loss_list:
-        i.mode = 'capture'
+        i.mode = 'capture_style'
     net(style_img)
 
-    for i in content_layer_loss:
+    import pdb; pdb.set_trace()
+    # Compute Gramma matrix for style loss 
+    for i in style_loss_list:
+        i.compute_match()
+        i.compute_style_gramm()
+
+    # reset the model to loss mode 
+    for i in content_loss_list:
         i.mode = 'loss'
     
-    for i in style_layer_loss:
+    for i in style_loss_list:
         i.mode = 'loss'
 
     for param in net.parameters(): # freeze new added loss layer 
         param.requires_grad = False
 
-    # Set image to be bp 
+    # Set image to be gradient updatable 
     native_img = nn.Parameter(native_img)
     assert(native_img.requires_grad==True)
 

@@ -22,4 +22,6 @@ This Repo is still under active develop and have not yet finish
 
 3. Pass 1 debug & test validation 
 
-4. notebook for bp work on mask area 
+4. pass 2 
+
+5. notebook for bp work on mask area 

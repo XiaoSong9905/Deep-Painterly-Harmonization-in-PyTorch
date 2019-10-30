@@ -25,3 +25,5 @@ This Repo is still under active develop and have not yet finish
 4. pass 2 
 
 5. notebook for bp work on mask area 
+
+6. (sx) periodic save, periodic print 

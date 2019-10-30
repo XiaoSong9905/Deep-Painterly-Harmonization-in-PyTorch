@@ -106,7 +106,7 @@ class StyleLossPass1(nn.Module):
     def __init__(self, style_weight, layer_mask, match_patch_size):
         super(StyleLossPass1, self).__init__()
         self.weight = style_weight
-        self.critertain = None # Should be gramm matric 
+        self.critertain = nn.MSELoss()
         self.mask = layer_mask.clone()
         print('StyleLossPass1 mask with shape {} registered'.format(str(self.mask.shape)))
         self.style_fm = None # Store the styled image's feature map C * H * W 
@@ -124,9 +124,9 @@ class StyleLossPass1(nn.Module):
             self.content_fm = input.detach()
             print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
         elif self.mode == 'loss':
+            # TODO complete this function 
             # compute gram with input (content image)
-            # compute loss with target gram 
-            #self.loss = self.critertain(input, self.target, self.mask)
+            # use input gram and target gram to compute loss 
             return input
         # If None, do nothing 
         return input
@@ -175,10 +175,11 @@ class StyleLossPass1(nn.Module):
 
         return None
 
-    def compute_style_gramm(self):
+    def compute_style_gramm(self, fm3d):
         # TODO finish this function 
 
-        return None 
+        gram = None 
+        return gram 
 
 class StyleLossPass2(StyleLossPass1):
     '''

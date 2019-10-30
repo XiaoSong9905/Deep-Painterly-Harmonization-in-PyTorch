@@ -12,3 +12,14 @@ Pytorch implementation of paper "[Deep Painterly Harmonization](https://arxiv.or
 Official code written in Torch and lua can be found here [Github Link](https://github.com/luanfujun/deep-painterly-harmonization)
 
 This Repo is still under active develop and have not yet finish
+
+
+## TODO 
+
+1. StyleLossPass2 
+
+2. StyleLossPass1 
+
+3. Pass 1 debug & test validation 
+
+4. notebook for bp work on mask area 

@@ -176,12 +176,16 @@ class StyleLossPass1(nn.Module):
         return None
 
     def compute_style_gramm(self):
-
+        # TODO finish this function 
 
         return None 
 
-class StyleLossPass2(nn.Module):
+class StyleLossPass2(StyleLossPass1):
+    '''
+    child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
+    '''
     def __init__(self):
         super(StyleLossPass2, self).__init__()
+
     def forward(self):
         return None 

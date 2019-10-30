@@ -57,7 +57,9 @@ parser.add_argument("-debug_mode", type=bool, default=True)
 
 cfg = parser.parse_args()
     
-def main():
+
+
+def pass1():
     # Set up device and datatye 
     dtype, device = setup(cfg)
 
@@ -169,7 +171,34 @@ def main():
     native_img = nn.Parameter(native_img)
     assert(native_img.requires_grad==True)
 
+    # Build optimizer and run optimizer 
+    def closure():
+        optimizer.zero_grad()
+        _  = net(native_img)
+        c_loss = 0 
+        s_loss = 0 
+        total_loss = 0 
 
+        for i in content_loss_list:
+            c_loss += i.loss.to(device)
+        for i in style_loss_list:
+            s_loss += i.loss.to(device)
+
+        periodic_print(cfg, i_iter, c_loss, s_loss)
+        
+        total_loss = s_loss + c_loss
+        total_loss.backward()
+
+        periodic_save(cfg, i_iter, native_img)
+    
+    optimizer = build_optimizer(cfg, native_img)
+    i_iter = 0
+    while i_iter <= cfg.n_iters:
+        optimizer.step(closure)
+    
+    print('===>deep painterly harmonization pass 1 is done')
+
+    return native_img
 
 if __name__ == '__main__':
-    main()
+    _ = pass1()

@@ -31,6 +31,43 @@ def setup(cfg):
 
     return dtype, device
 
+def build_optimizer(cfg, img):
+    '''
+    Input:
+        img : Tensor type image with require_grad = True
+            can be build by passing image through `img = nn.Parameter(img)`
+    '''
+    # optimizer = torch.optim.SGD(model.parameters(), lr = 0.001)
+    if cfg.optim == 'adam':
+        optimizer = optim.Adam([img], cfg.lr)
+    elif cfg.optim == 'lbfgs':
+        # TODO lbfgs optimizer setup is different then Adam, setup this 
+        optimizer = None
+    else:
+        # TODO raise error that optimizer type not support 
+        return None
+    
+    return optimizer
+
+def periodic_print(cfg, i_iter, c_loss, s_loss):
+    '''
+    Functionality : 
+        print loss information for each module 
+    '''
+    # TODO implement this function 
+
+    return None 
+
+def periodic_save(cfg, i_iter, img):
+    '''
+    Functionality : 
+        save naive image periodically 
+        save naive image at the final step 
+    '''
+    # TODO implement this function 
+
+    return None 
+
 def save_img_plt(img, path, gray=False):
     '''
     Input : 1 * 1 * H * W / 1 * 3 * H * W Tensor 

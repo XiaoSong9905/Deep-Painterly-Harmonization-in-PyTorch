@@ -27,3 +27,5 @@ This Repo is still under active develop and have not yet finish
 5. (sx) notebook for bp work on mask area [DONE]
 
 6. (sx) periodic save, periodic print [DONE]
+
+7. need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. 

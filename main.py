@@ -58,6 +58,7 @@ parser.add_argument("-match_patch_size", type=int, default=3)
 
 # Other option 
 parser.add_argument("-debug_mode", type=bool, default=True)
+parser.add_argument("-normalize_gradient", type=bool, default=False) # TODO normalize gradient is currently not supported 
 
 cfg = parser.parse_args()
     
@@ -94,24 +95,16 @@ def pass1():
     # TODO in order to save computation time, only use the cnn untile the last layer of style / content loss 
  
     for i, layer in enumerate(list(cnn)):
-        # Add Backbone Layer 
-        # If cnn backbone have other module, add other module in this stage         
         if isinstance(layer, nn.Conv2d):
             net.add_module(str(len(net)), layer)
             sap = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
-            #print('mask before sap', mask)
-            #save_img_plt(mask, 'sap_mask_'+str(i)+'_before.png', gray=True)
             mask = sap(mask)
-            #save_img_plt(mask, 'sap_mask_'+str(i)+'_after.png', gray=True)
-            #print('mask after sap', mask)
+            # sap get a weighted mask, to see how this work, checkout the `understand mask` notebook 
         elif isinstance(layer, nn.ReLU):
             net.add_module(str(len(net)), layer)
         elif isinstance(layer, nn.MaxPool2d) or isinstance(layer, nn.AvgPool2d):
             net.add_module(str(len(net)), layer)
-            #save_img_plt(mask, 'resize_mask_'+str(i)+'_before.png', gray=True)
-            #print(mask.shape)
             mask = F.interpolate(mask, scale_factor=(0.5, 0.5)) # resize 0.5 may not work, the network don't garentee a fix output 
-            #save_img_plt(mask, 'resize_mask_'+str(i)+'_after.png', gray=True)
 
         # Add Loss layer 
         if layer_list[i] in content_layers:

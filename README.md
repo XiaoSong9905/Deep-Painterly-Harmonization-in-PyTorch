@@ -22,14 +22,16 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 1. StyleLossPass2 
 
-2. (sx) StyleLossPass1 
+2. (sx) StyleLossPass1 [DONE]
 
-3. (sx) Pass 1 debug & test validation 
+3. (sx) Pass 1 debug & test validation [DONE]
 
-4. pass 2 
+4. pass 2 (should be similar to pass 1 except broadcating the match relation between different layer)
 
 5. (sx) notebook for bp work on mask area [DONE]
 
 6. (sx) periodic save, periodic print [DONE]
 
-7. need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. 
+7. (sx) need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. [DONE]
+
+8. TVLoss module 

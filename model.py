@@ -16,6 +16,7 @@ import math
 import numpy as np 
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
+import time 
 
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2','pool1', 
@@ -86,7 +87,7 @@ class ContentLoss(nn.Module):
 
             # Update Mask Size after feature map is captured 
             self.mask = self.mask.expand_as(self.content_fm)
-            print('Mask is resize to {}'.format(str(self.mask.shape)))
+            print('ContentLoss Mask is resize to {}'.format(str(self.mask.shape)))
 
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
@@ -158,13 +159,13 @@ class StyleLossPass1(nn.Module):
         if self.mode == 'capture_style':
             # Capture Style is done after capture content 
             style_fm = input.detach()
-            print('StyleLossPass1 style feature map with shape {} captured'.format(str(self.style_fm.shape)))
+            print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Style Gram Matrix 
             style_fm_matched = self.match_fm(style_fm, self.img_fm)
             style_fm_matched_masked = torch.mul(style_fm_matched, self.mask) 
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask) # See Gatys `2.2. Style representation` to see how style loss defined over gram matrix 
-            print('StyleLossPass1 style gram matrix under mask with shape {}'.format(str(self.style_gram)))
+            print('StyleLossPass1 style gram matrix under mask with shape {}'.format(str(self.style_matched_gram.shape)))
 
             # Delete unused variable to save memory, we only need the matched gram matrix 
             del self.img_fm
@@ -173,11 +174,11 @@ class StyleLossPass1(nn.Module):
         elif self.mode == 'capture_content':
             # Capture Content fm first, since we need content image fm when initialize the match during style match 
             self.img_fm = input.detach()
-            print('StyleLossPass1 img (naive stich) feature map with shape {} captured'.format(str(self.content_fm.shape)))
+            print('StyleLossPass1 img (naive stich) feature map with shape {} captured'.format(str(self.img_fm.shape)))
 
             # Update Mask Size after feature map is captured 
             self.mask = self.mask.expand_as(self.img_fm)
-            print('StyleLossPass1 mask expand to shape {}'.format(str(self.mask )))
+            print('StyleLossPass1 mask expand to shape {}'.format(str(self.mask.shape)))
 
         elif self.mode == 'loss':
             # input in this case is the naive stiched image's fm 
@@ -204,30 +205,39 @@ class StyleLossPass1(nn.Module):
             style_fm_masked : 1 * C * H * W
 
         '''
+        since = time.time()
+        # TODO set a time count on how long it takes to compute the match 
+        print('===>StyleLossPass1 Start to match feature map')
+
         # Create a copy of style image fm (to matain size)
         style_fm_masked = style_fm.clone() # create a copy of the same size 
-        n_patch_h = math.floor(style_fm_masked.shape[3] / 3) # use math package to avoid potential python2 issue 
-        n_patch_w = math.floor(style_fm_masked.shape[2] / 3)
+        n_patch_h = math.floor(style_fm_masked.shape[2] / 3) # use math package to avoid potential python2 issue 
+        n_patch_w = math.floor(style_fm_masked.shape[3] / 3)
 
         stride = self.match_patch_size
         patch_size = self.match_patch_size
+
         for i in range(n_patch_h):
-            for j in range(n_patch_w):                
+            for j in range(n_patch_w):               
                 # Each kernal represent a patch in content fm 
                 kernal = img_fm[:, :, i*patch_size:(i+1)*patch_size, j*patch_size:(j+1)*patch_size]
 
                 # Compute score map for each content fm patch 
                 score_map = F.conv2d(style_fm, kernal, stride=stride) # 1 * 1 * n_patch_h * n_patch_w
                 score_map = score_map[0, 0, :, :] # n_patch_h * n_patch_w
-                
                 idx = torch.argmax(score_map).item()
                 matched_style_idx = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
-                                
-                style_fm_masked[:, :, i*patch_size:(i+1)*patch_size, j*patch_size:(j+1)*patch_size] = style_fm[:, :, 
-                        matched_style_idx[0]*patch_size: (matched_style_idx[0]+1)*patch_size, \
-                            matched_style_idx[1]*patch_size: (matched_style_idx[1]+1)*patch_size]
+                
+                # Find matched patch 
+                matched_style_patch = style_fm[:, :, matched_style_idx[0]*patch_size: (matched_style_idx[0]+1)*patch_size, \
+                            matched_style_idx[1]*patch_size: (matched_style_idx[1]+1)*patch_size] # matched have shape 1 * C * 3 * 3
+
+                style_fm_masked[:, :, i*patch_size:(i+1)*patch_size, j*patch_size:(j+1)*patch_size] = matched_style_patch
         
-        assert(patch_size.shape == img_fm.shape)
+        assert(style_fm_masked.shape == img_fm.shape)
+
+        time_elapsed = time.time() - since
+        print('===>StyleLossPass1 Finish matching feature map with time{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
         return style_fm_masked
 

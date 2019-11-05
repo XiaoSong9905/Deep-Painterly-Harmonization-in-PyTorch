@@ -34,8 +34,8 @@ parser.add_argument("-p2_output_img", help="./path/file for output image", defau
 parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int, default=512)
 
 # Training Parameter 
-parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='lbfgs')
-parser.add_argument("-lr", type=float, default=1e-2)
+parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam')
+parser.add_argument("-lr", type=float, default=1e-1)
 parser.add_argument("-p1_n_iters", type=int, default=1000)
 parser.add_argument("-p2_n_iters", type=int, default=1000)
 parser.add_argument("-print_interval", type=int, default=100)
@@ -63,8 +63,6 @@ parser.add_argument("-mask_gradient_bp", type=bool, default=False) # TODO implem
 
 cfg = parser.parse_args()
     
-
-
 def pass1():
     # Set up device and datatye 
     dtype, device = setup(cfg)
@@ -128,7 +126,9 @@ def pass1():
     if cfg.debug_mode:
         print('===>build net')
         print('net is', net)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
+
+    print('===>capture content fm')
     # Go pass the net to capture information we need 
     for i in content_loss_list:
         i.mode = 'capture'
@@ -136,13 +136,15 @@ def pass1():
         i.mode = 'capture_content'
     net(native_img)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
+    print('===>capture style fm & compute match and style gram')
     for i in content_loss_list:
         i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'capture_style'
     net(style_img)
 
+    print('===>reset network to loss mode and freeze parameter')
     # reset the model to loss mode 
     for i in content_loss_list:
         i.mode = 'loss'
@@ -158,13 +160,15 @@ def pass1():
     assert(native_img.requires_grad==True)
 
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
+        # TODO set print precition to be the same, need to convert tensor to python variable first 
         if i_iter % cfg.print_interval == 0:
             print('Iteration {} ; Content Loss {}; Style Loss {}; Total Loss {}'.format(\
-                str(i_iter), str(c_loss), str(s_loss), str(total_loss)))
+                str(i_iter), str(c_loss.item()), str(s_loss.item()), str(total_loss.item())))
     
     def periodic_save(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters) 
         if flag:
+            print('===>save image at iteration {}'.format(str(i_iter)))
             output_filename, file_extension = os.path.splitext(cfg.p1_output_img)
             if i_iter == cfg.p1_n_iters:
                 filename = output_filename + str(file_extension)
@@ -190,7 +194,7 @@ def pass1():
         total_loss = s_loss + c_loss
         total_loss.backward()
         
-        # TODO use mask to select gradient over the naive image 
+        native_img.grad = native_img.grad * loss_mask.expand_as(native_img)
 
         periodic_print(i_iter, c_loss, s_loss, total_loss)
         periodic_save(i_iter)
@@ -198,7 +202,6 @@ def pass1():
     optimizer = build_optimizer(cfg, native_img)
     i_iter = 0
     while i_iter <= cfg.p1_n_iters:
-        print('Iteration {}'.format(i_iter))
         optimizer.step(closure)
         i_iter += 1
     

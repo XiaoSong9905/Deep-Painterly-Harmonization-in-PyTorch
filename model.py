@@ -33,8 +33,6 @@ vgg19_dict = [
     'conv5_1',  'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'conv5_4', 'relu5_4', 'pool5'
 ]
     
-# TODO add model dict for resnet
-
 def build_backbone(cfg, device):
     donwload_weight = True
     user_pretrained_dict = None
@@ -62,7 +60,6 @@ def build_backbone(cfg, device):
         param.requires_grad = False
 
     # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
-    # TODO not sure if gradient will be backprop to image layer, need to check neural-style imlementation 
 
     #if cfg.debug_mode:
     #    print('===>build model')
@@ -86,13 +83,34 @@ class ContentLoss(nn.Module):
     def forward(self, input):
         # TODO check what the capture mode have really capture 
         if self.mode == 'capture':
+            # Capture 
             self.content_fm = input.detach()
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+
+            # Update Mask Size after feature map is captured 
+            self.mask = self.mask.expand_as(self.content_fm)
+            print('Mask is resize to {}'.format(str(self.mask.shape)))
+
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.target) * self.weight
-        
-        # If None, do nothing 
+            # In the lua code, `self.gradInput:div(torch.norm())` is called, this is mainly due 
+            #     to the fact that lua do not support autograde. When defining your own loss function 
+            #     you may probabaly need to do something similar, 
+            #     check https://cs230-stanford.github.io/pytorch-getting-started.html#loss-function loss section 
+            def backward_variable_hook_fn(grad):
+                return grad * self.mask
+
+            self.loss.register_hook(backward_variable_hook_fn)
+
         return input
+    
+    def backward_hook_fn(self, grad_input, grad_output):
+        # 返回 Tensor 或者 None，backward hook 函数不能直接改变它的输入变量，但是可以返回新的 grad_input，反向传播到它上一个模块。
+        # https://zhuanlan.zhihu.com/p/75054200 
+        # Original Implementation have mask over the backward gradient 
+        # 只能使用对于Tensor 的hook 
+
+        return None 
 
 class StyleLossPass1(nn.Module):
     '''
@@ -125,8 +143,13 @@ class StyleLossPass1(nn.Module):
             self.style_fm = input.detach()
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(self.style_fm.shape)))
         elif self.mode == 'capture_content':
+            # Capture Feature Map 
             self.content_fm = input.detach()
             print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+
+            # Update Mask Size after feature map is captured 
+            self.mask = self.mask.expand_as(self.content_fm)
+
         elif self.mode == 'loss':
             # TODO complete this function 
             # compute gram with input (content image)

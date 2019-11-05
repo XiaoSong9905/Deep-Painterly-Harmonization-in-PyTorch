@@ -101,9 +101,11 @@ class ContentLoss(nn.Module):
         return input
 
 class GramMatrix(nn.Module):
-    # Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
-    # To understand how this work, checkout `understand Gram Matrix` notebook 
-    # Gram Matrix is not complicated thing, it's just covariance matrix 
+    '''
+    Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
+    To understand how gram matrix work, checkout `understand Gram Matrix` notebook 
+    ! Gram Matrix is not complicated thing, it's just covariance matrix 
+    '''
 
     def __init__(self):
         super(GramMatrix, self).__init__()
@@ -140,85 +142,95 @@ class StyleLossPass1(nn.Module):
     def __init__(self, style_weight, layer_mask, match_patch_size):
         super(StyleLossPass1, self).__init__()
         self.weight = style_weight
-        self.critertain = nn.MSELoss()
+        self.critertain = nn.MSELoss() # TODO check the implementation using MSELoss and gram matrix match the one in papaer 
+        self.gram = GramMatrix()
+
         self.mask = layer_mask.clone()
-        print('StyleLossPass1 mask with shape {} registered'.format(str(self.mask.shape)))
         self.style_fm = None # Store the styled image's feature map C * H * W 
-        self.content_fm = None # Store the naive stich image's feature map 
-        self.target_gram = None # gram matrix of style image under the mask constrain 
+        self.img_fm = None # Store the naive stich image's feature map 
+        self.style_gram = None # gram matrix of style image under the mask constrain (1 * C * C)
+
         self.mode = 'None'
         self.loss = None 
         self.match_patch_size = match_patch_size
 
     def forward(self, input):
         if self.mode == 'capture_style':
-            self.style_fm = input.detach()
+            # Capture Style is done after capture content 
+            style_fm = input.detach()
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(self.style_fm.shape)))
+
+            # Compute Style Gram Matrix 
+            style_fm_matched = self.match_fm(style_fm, self.img_fm)
+            style_fm_matched_masked = torch.mul(style_fm_matched, self.mask) 
+            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask) # See Gatys `2.2. Style representation` to see how style loss defined over gram matrix 
+            print('StyleLossPass1 style gram matrix under mask with shape {}'.format(str(self.style_gram)))
+
+            # Delete unused variable to save memory, we only need the matched gram matrix 
+            del self.img_fm
+            del style_fm
+
         elif self.mode == 'capture_content':
-            # Capture Feature Map 
-            self.content_fm = input.detach()
-            print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+            # Capture Content fm first, since we need content image fm when initialize the match during style match 
+            self.img_fm = input.detach()
+            print('StyleLossPass1 img (naive stich) feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.content_fm)
+            self.mask = self.mask.expand_as(self.img_fm)
+            print('StyleLossPass1 mask expand to shape {}'.format(str(self.mask )))
 
         elif self.mode == 'loss':
-            # TODO complete this function 
-            # compute gram with input (content image)
-            # use input gram and target gram to compute loss 
-            return input
+            # input in this case is the naive stiched image's fm 
+            self.img_gram = self.gram(torch.mul(input, self.mask)) 
+            self.img_gram = self.img_gram / torch.sum(self.mask)
+            self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
+            
         # If None, do nothing 
         return input
 
-    def compute_match(self):
+    def match_fm(self, style_fm, img_fm):
         '''
+        Input : 
+            style_fm, img_fm : 1 * C * H * W
+
         Process:
             Instead of only compute the match for pixel inside the mask, here we compute the 
                 match for the whole feature map and use mask to filter out the matched pixel we don't need 
-            For feature map of size C * H * W, one unit of patch is by default set to be C * 3 * 3 and L2 
-                Norm is computed on top of it.
             Patch Match is done in convolution fashion where content image's patch is used as kernal and applied 
-                to the styled image, a score map will be computed and we construct the matched style feature map 
-                on top of the score map 
-            Content Feature Map is set to be unchanged and we split the Style Feature Map and create a new 
-                matched style feature map 
+                to the styled image, a score map will be computed (w.r.t each content fm patch) and we construct the 
+                matched style feature map using the score map we get for each content fm patch 
+        
+        Output:
+            style_fm_masked : 1 * C * H * W
+
         '''
-        assert(self.content_fm is not None)
-        assert(self.style_fm is not None)
-
         # Create a copy of style image fm (to matain size)
-        self.match_style_fm = self.style_fm.clone() # create a copt of the same size 
-        n_patch_h = math.floor(self.match_style_fm.shape[1] / self.match_patch_size) # use math package to avoid potential python2 issue 
-        n_patch_w = math.floor(self.match_style_fm.shape[0] / self.match_patch_size)
+        style_fm_masked = style_fm.clone() # create a copy of the same size 
+        n_patch_h = math.floor(style_fm_masked.shape[3] / 3) # use math package to avoid potential python2 issue 
+        n_patch_w = math.floor(style_fm_masked.shape[2] / 3)
 
-        # TODO this function have not yet been tested yet
-        # Use content image feature map as kernal and compute score map on style image
         stride = self.match_patch_size
+        patch_size = self.match_patch_size
         for i in range(n_patch_h):
-            for j in range(n_patch_w):
-                kernal = self.content_fm[:, :, i*self.match_patch_size:i*(self.match_patch_size + 1), \
-                    j*self.match_patch_size:j*(self.match_patch_size+1)]
-                print('kernal size', kernal.shape)
-                print('fm size', self.match_style_fm.shape)
+            for j in range(n_patch_w):                
+                # Each kernal represent a patch in content fm 
+                kernal = img_fm[:, :, i*patch_size:(i+1)*patch_size, j*patch_size:(j+1)*patch_size]
 
-                # For F.conv2d : https://pytorch.org/docs/stable/nn.functional.html
-                score_map = F.conv2d(self.style_fm, kernal, stride=stride)
+                # Compute score map for each content fm patch 
+                score_map = F.conv2d(style_fm, kernal, stride=stride) # 1 * 1 * n_patch_h * n_patch_w
+                score_map = score_map[0, 0, :, :] # n_patch_h * n_patch_w
                 
                 idx = torch.argmax(score_map).item()
-                indices = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
-                
-                self.match_style_fm[:, :, i*self.match_patch_size:i*(self.match_patch_size + 1), \
-                    j*self.match_patch_size:j*(self.match_patch_size+1)] = self.style_fm[:, :, \
-                        indices[0]*self.match_patch_size: indices[0]*(self.match_patch_size+1), \
-                            indices[1]*self.match_patch_size: indices[1]*(self.match_patch_size+1)]
+                matched_style_idx = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
+                                
+                style_fm_masked[:, :, i*patch_size:(i+1)*patch_size, j*patch_size:(j+1)*patch_size] = style_fm[:, :, 
+                        matched_style_idx[0]*patch_size: (matched_style_idx[0]+1)*patch_size, \
+                            matched_style_idx[1]*patch_size: (matched_style_idx[1]+1)*patch_size]
+        
+        assert(patch_size.shape == img_fm.shape)
 
-        return None
+        return style_fm_masked
 
-    def compute_style_gramm(self, fm3d):
-        # TODO finish this function 
-
-        gram = None 
-        return gram 
 
 class StyleLossPass2(StyleLossPass1):
     '''

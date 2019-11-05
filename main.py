@@ -143,12 +143,6 @@ def pass1():
         i.mode = 'capture_style'
     net(style_img)
 
-    import pdb; pdb.set_trace()
-    # Compute Gramma matrix for style loss 
-    for i in style_loss_list:
-        i.compute_match()
-        i.compute_style_gramm()
-
     # reset the model to loss mode 
     for i in content_loss_list:
         i.mode = 'loss'
@@ -160,8 +154,7 @@ def pass1():
         param.requires_grad = False
 
     # Set image to be gradient updatable 
-    img = native_img
-    img = nn.Parameter(img)
+    native_img = nn.Parameter(native_img)
     assert(native_img.requires_grad==True)
 
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
@@ -177,14 +170,14 @@ def pass1():
                 filename = output_filename + str(file_extension)
             else:
                 filename = str(output_filename) + "_iter_" + str(i_iter) + str(file_extension)
-            img_deprocessed = img_deprocess(img)
+            img_deprocessed = img_deprocess(native_img)
 
             img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer 
     def closure():
         optimizer.zero_grad()
-        _  = net(img)
+        _  = net(native_img)
         c_loss = 0 
         s_loss = 0 
         total_loss = 0 
@@ -202,9 +195,10 @@ def pass1():
         periodic_print(i_iter, c_loss, s_loss, total_loss)
         periodic_save(i_iter)
     
-    optimizer = build_optimizer(cfg, img)
+    optimizer = build_optimizer(cfg, native_img)
     i_iter = 0
     while i_iter <= cfg.p1_n_iters:
+        print('Iteration {}'.format(i_iter))
         optimizer.step(closure)
         i_iter += 1
     

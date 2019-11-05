@@ -168,9 +168,10 @@ def pass1():
     img = nn.Parameter(img)
     assert(native_img.requires_grad==True)
 
-    def periodic_print(i_iter):
-
-        return None 
+    def periodic_print(i_iter, c_loss, s_loss, total_loss):
+        if i_iter % cfg.print_interval == 0:
+            print('Iteration {} ; Content Loss {}; Style Loss {}; Total Loss {}'.format(\
+                str(i_iter), str(c_loss), str(s_loss), str(total_loss)))
     
     def periodic_save(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters) 

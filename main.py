@@ -91,6 +91,8 @@ def pass1():
     if cfg.debug_mode:
         print('===>build net with loss module')
 
+    # TODO in order to save computation time, only use the cnn untile the last layer of style / content loss 
+ 
     for i, layer in enumerate(list(cnn)):
         # Add Backbone Layer 
         # If cnn backbone have other module, add other module in this stage         
@@ -200,14 +202,17 @@ def pass1():
         
         total_loss = s_loss + c_loss
         total_loss.backward()
+        
+        # TODO use mask to select gradient over the naive image 
 
-        periodic_print(i_iter)
+        periodic_print(i_iter, c_loss, s_loss, total_loss)
         periodic_save(i_iter)
     
     optimizer = build_optimizer(cfg, img)
     i_iter = 0
     while i_iter <= cfg.p1_n_iters:
         optimizer.step(closure)
+        i_iter += 1
     
     print('===>deep painterly harmonization pass 1 is done')
 

@@ -108,7 +108,7 @@ def pass1():
             net.add_module(str(len(net)), layer)
             #save_img_plt(mask, 'resize_mask_'+str(i)+'_before.png', gray=True)
             #print(mask.shape)
-            mask = F.interpolate(mask, scale_factor=(0.5, 0.5))
+            mask = F.interpolate(mask, scale_factor=(0.5, 0.5)) # resize 0.5 may not work, the network don't garentee a fix output 
             #save_img_plt(mask, 'resize_mask_'+str(i)+'_after.png', gray=True)
 
         # Add Loss layer 

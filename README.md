@@ -18,12 +18,12 @@ This Repo is still under active develop and have not yet finish
 
 1. StyleLossPass2 
 
-2. StyleLossPass1 
+2. (sx) StyleLossPass1 
 
-3. Pass 1 debug & test validation 
+3. (sx) Pass 1 debug & test validation 
 
 4. pass 2 
 
-5. notebook for bp work on mask area 
+5. (sx) notebook for bp work on mask area [DONE]
 
 6. (sx) periodic save, periodic print 

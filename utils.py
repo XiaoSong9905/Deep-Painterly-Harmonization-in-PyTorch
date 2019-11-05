@@ -49,25 +49,6 @@ def build_optimizer(cfg, img):
     
     return optimizer
 
-def periodic_print(cfg, i_iter, c_loss, s_loss):
-    '''
-    Functionality : 
-        print loss information for each module 
-    '''
-    # TODO implement this function 
-
-    return None 
-
-def periodic_save(cfg, i_iter, img):
-    '''
-    Functionality : 
-        save naive image periodically 
-        save naive image at the final step 
-    '''
-    # TODO implement this function 
-
-    return None 
-
 def save_img_plt(img, path, gray=False):
     '''
     Input : 1 * 1 * H * W / 1 * 3 * H * W Tensor 
@@ -151,5 +132,21 @@ def img_preprocess(img_file, out_shape, dtype, device, cfg, name='img_preprocess
         save_img_plt(img, name)
 
     return img
+    
+def img_deprocess(img_tensor):
+    '''
+    Input : 
+        img_tensor : 1 * 3 * H * W Tensor represent the updated image 
+    Notice : 
+        remember to clone() the value when given as input to this function 
+    Return : 
+        PIL.Image 
+    '''
+    de_normalize = transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])
+    img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
+    # img_tensor.clamp_(0, 1)
+    img = transforms.ToPILImage(mode='L')(img_tensor)
+
+    return img 
     
     

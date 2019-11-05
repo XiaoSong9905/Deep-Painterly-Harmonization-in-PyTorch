@@ -31,7 +31,7 @@ parser.add_argument("-tight_mask", help="./path/file to tight mask", default='da
 parser.add_argument("-dilated_mask", help="./path/file to dilated(loss) mask", default='data/0_c_mask_dilated.jpg')
 parser.add_argument("-p1_output_img", help="./path/file for output image", default='output/0_pass1_out.jpg')
 parser.add_argument("-p2_output_img", help="./path/file for output image", default='output/0_pass2_out.jpg')
-parser.add_argument("-output_img_size", help="Max side(H/W) for output image", type=int, default=500)
+parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int, default=512)
 
 # Training Parameter 
 parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='lbfgs')
@@ -164,13 +164,30 @@ def pass1():
         param.requires_grad = False
 
     # Set image to be gradient updatable 
-    native_img = nn.Parameter(native_img)
+    img = native_img
+    img = nn.Parameter(img)
     assert(native_img.requires_grad==True)
+
+    def periodic_print(i_iter):
+
+        return None 
+    
+    def periodic_save(i_iter):
+        flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters) 
+        if flag:
+            output_filename, file_extension = os.path.splitext(cfg.p1_output_img)
+            if i_iter == cfg.p1_n_iters:
+                filename = output_filename + str(file_extension)
+            else:
+                filename = str(output_filename) + "_iter_" + str(i_iter) + str(file_extension)
+            img_deprocessed = img_deprocess(img)
+
+            img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer 
     def closure():
         optimizer.zero_grad()
-        _  = net(native_img)
+        _  = net(img)
         c_loss = 0 
         s_loss = 0 
         total_loss = 0 
@@ -179,15 +196,14 @@ def pass1():
             c_loss += i.loss.to(device)
         for i in style_loss_list:
             s_loss += i.loss.to(device)
-
-        periodic_print(cfg, i_iter, c_loss, s_loss)
         
         total_loss = s_loss + c_loss
         total_loss.backward()
 
-        periodic_save(cfg, i_iter, native_img)
+        periodic_print(i_iter)
+        periodic_save(i_iter)
     
-    optimizer = build_optimizer(cfg, native_img)
+    optimizer = build_optimizer(cfg, img)
     i_iter = 0
     while i_iter <= cfg.p1_n_iters:
         optimizer.step(closure)

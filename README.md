@@ -35,3 +35,5 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 7. (sx) need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. [DONE]
 
 8. TVLoss module 
+
+9. code update to support GPU setting, some job is done but not all. need to run on google colab to check GPU support 

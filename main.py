@@ -59,6 +59,7 @@ parser.add_argument("-match_patch_size", type=int, default=3)
 # Other option 
 parser.add_argument("-debug_mode", type=bool, default=True)
 parser.add_argument("-normalize_gradient", type=bool, default=False) # TODO normalize gradient is currently not supported 
+parser.add_argument("-mask_gradient_bp", type=bool, default=False) # TODO implementation detail, wether mask gradient during backprop 
 
 cfg = parser.parse_args()
     

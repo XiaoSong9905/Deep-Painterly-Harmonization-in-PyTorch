@@ -73,15 +73,12 @@ def build_backbone(cfg, device):
 class ContentLoss(nn.Module):
     def __init__(self, content_weight, layer_mask):
         super(ContentLoss, self).__init__()
-        self.weight = content_weight
+        self.weight = content_weight # content loss weight 
         self.criterian = nn.MSELoss()
-        self.mask = layer_mask.clone()
-        self.content_fm = None # Store the original naive stich image's feature map 
+        self.mask = layer_mask.clone() # a weighted mask, not binary mask. To see why check `understand mask` notebook 
         self.mode = 'None'
-        self.loss = None 
     
     def forward(self, input):
-        # TODO check what the capture mode have really capture 
         if self.mode == 'capture':
             # Capture 
             self.content_fm = input.detach()
@@ -92,25 +89,40 @@ class ContentLoss(nn.Module):
             print('Mask is resize to {}'.format(str(self.mask.shape)))
 
         elif self.mode == 'loss':
-            self.loss = self.criterian(input, self.target) * self.weight
-            # In the lua code, `self.gradInput:div(torch.norm())` is called, this is mainly due 
-            #     to the fact that lua do not support autograde. When defining your own loss function 
-            #     you may probabaly need to do something similar, 
-            #     check https://cs230-stanford.github.io/pytorch-getting-started.html#loss-function loss section 
-            def backward_variable_hook_fn(grad):
-                return grad * self.mask
+            self.loss = self.criterian(input, self.content_fm) * self.weight
 
-            self.loss.register_hook(backward_variable_hook_fn)
+            def backward_variable_gradient_mask_hook_fn(grad):
+                # Complex Module do not support `register_backward_tensor()`
+                # Simple solution to mask gradient is to register hook on variable 
+                return torch.mul(grad, self.mask) 
+
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
-    
-    def backward_hook_fn(self, grad_input, grad_output):
-        # 返回 Tensor 或者 None，backward hook 函数不能直接改变它的输入变量，但是可以返回新的 grad_input，反向传播到它上一个模块。
-        # https://zhuanlan.zhihu.com/p/75054200 
-        # Original Implementation have mask over the backward gradient 
-        # 只能使用对于Tensor 的hook 
 
-        return None 
+class GramMatrix(nn.Module):
+    # Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
+    # To understand how this work, checkout `understand Gram Matrix` notebook 
+    # Gram Matrix is not complicated thing, it's just covariance matrix 
+
+    def __init__(self):
+        super(GramMatrix, self).__init__()
+    
+    def forward(self, input):
+        '''
+        Input : 
+            input (represent feature map) : B * C * H * W 
+        Output : 
+            gram : B * (C * C) 
+                   when batch size is 1, then output shape 1 * C * C 
+        '''
+        B, C, H, W = input.shape
+        output = torch.zeros((B, C, C))
+        for i in range(B):
+            fm_flat = input[i].view(C, H * W)
+            output[i] = torch.mm(fm_flat, fm_flat.t())
+
+        return output
 
 class StyleLossPass1(nn.Module):
     '''

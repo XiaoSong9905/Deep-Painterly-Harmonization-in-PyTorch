@@ -37,3 +37,17 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 8. TVLoss module 
 
 9. code update to support GPU setting, some job is done but not all. need to run on google colab to check GPU support 
+
+
+## Auxilary Network Dataset 
+
+Some dataset have been found that might work for the auxilary network (network that pick the weight of loss)
+
+[WikiArt from ArtGan - Github Link](https://github.com/cs-chan/ArtGAN/tree/master/WikiArt%20Dataset)
+
+* [dataset download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart.zip)
+
+* [annotation download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart_csv.zip)  (use the style data part)
+
+
+[Kaggle Competation on Art style](https://www.kaggle.com/c/painter-by-numbers/data)

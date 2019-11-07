@@ -139,7 +139,7 @@ def train_net():
    print('===> Start Training Network')
    start_time = time.time()
 
-   model, start_epoch = build_net(mode=cfg.mode, model_file_path=cfg.checkpoint_file)
+   model, start_epoch = build_net(mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
    model = model.to(device)
 
    optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
@@ -221,8 +221,19 @@ def train_net():
 
    print('===> Finish Train Network with {} min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
 
-def inference():
-   return None
+def inference(device, img, checkpoint_file):
+   model, _ = build_net('inference', checkpoint_file=checkpoint_file)
+   model = model.to(device)
+   output = model(img)
+   print('output shape', output.shape)
+   print('output type', type(output))
+   output_np = output.numpy()
+
+   value_dict = [[1,2]]
+   loss_weight = value_dict * output_np
+   loss_weight = np.sum(loss_weight, axis=1)
+
+   return loss_weight[0], loss_weight[1]
 
 if __name__ == '__main__':
    train_net()

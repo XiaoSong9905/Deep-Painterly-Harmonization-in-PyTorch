@@ -42,6 +42,8 @@ parser.add_argument("-save_model_interval", type=int, default=100)
 parser.add_argument("-save_checkpoint_path", help="path to save model", default="./auxilary_model/")
 parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = -1", default=-1)
 
+parser.add_argument("-debug_mode", type=bool, default=True)
+
 cfg = parser.parse_args()
 
 def build_net(mode='start', checkpoint_file=None):
@@ -71,7 +73,12 @@ def build_net(mode='start', checkpoint_file=None):
 
       user_epoch = 0 
 
-   elif mode == 'continue' or mode == 'eval':
+      state = {'epoch': user_epoch + 1, 
+                  'model':model.state_dict()}
+      save_file_name = 'initial_model'
+      torch.save(state, save_file_name)
+
+   elif mode == 'continue' or mode == 'inference':
       model = models.resnet18(pretrained=False)
       model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
       
@@ -89,7 +96,7 @@ def build_net(mode='start', checkpoint_file=None):
       print('Model with weight in `{}` is build'.format(checkpoint_file))
 
       if mode=='inference':
-         model = nn.Sequential(model, nn.Softmax())
+         model = nn.Sequential(model, nn.Softmax(dim=0))
          model = model.eval()
          for param in model.parameters():
             param.requires_grad = False
@@ -105,6 +112,15 @@ def train_net():
    # https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html 
 
    dtype, device = setup(cfg)
+
+   # Build Network 
+   model, start_epoch = build_net(mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
+   model = model.to(device)
+
+   optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
+   schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
+   criterian = nn.CrossEntropyLoss()
 
    # Get Data 
    print('===> Start Prepare Data')
@@ -138,14 +154,6 @@ def train_net():
    # Get Model & Optimizer & Schedular 
    print('===> Start Training Network')
    start_time = time.time()
-
-   model, start_epoch = build_net(mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
-   model = model.to(device)
-
-   optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
-   schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
-   criterian = nn.CrossEntropyLoss()
 
    # Run epoch 
    # Model performence is evaluated every epoch 
@@ -225,15 +233,24 @@ def inference(device, img, checkpoint_file):
    model, _ = build_net('inference', checkpoint_file=checkpoint_file)
    model = model.to(device)
    output = model(img)
-   print('output shape', output.shape)
-   print('output type', type(output))
-   output_np = output.numpy()
 
-   value_dict = [[1,2]]
-   loss_weight = value_dict * output_np
-   loss_weight = np.sum(loss_weight, axis=1)
+   output_np = output.squeeze(0).numpy()
 
-   return loss_weight[0], loss_weight[1]
+   # TODO add weight based on paper 
+   style_loss_weight = np.array(([[10]*27])).T.squeeze(1)
+   tv_loss_weight = np.array(([[10]*27])).T.squeeze(1) # Need shape to be (27,)
+
+   assert(style_loss_weight.shape == output_np.shape)
+   assert(tv_loss_weight.shape == output_np.shape)
+
+   style_loss_weight_final = np.sum(np.multiply(output_np, style_loss_weight))
+   tv_loss_weight_final = np.sum(np.multiply(output_np, tv_loss_weight))
+
+   print('===> Style Image loss weight choice {} & {}'.format(style_loss_weight_final, tv_loss_weight_final))
+
+   return style_loss_weight_final, tv_loss_weight_final
 
 if __name__ == '__main__':
    train_net()
+   #img = torch.rand((1, 3, 300, 300))
+   #inference('cpu', img, checkpoint_file='./initial_model')

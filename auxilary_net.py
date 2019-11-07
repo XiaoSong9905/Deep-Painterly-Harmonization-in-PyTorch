@@ -97,7 +97,7 @@ def build_net(mode='start', checkpoint_file=None):
       # TODO raise exception error 
       model = None 
       user_epoch = 0
-      
+
    return model, user_epoch
 
 def train_net():
@@ -213,7 +213,7 @@ def train_net():
 
 
       # Save Model if required 
-      if epoch % cfg.save_model_interval == 0:
+      if epoch % cfg.save_model_interval == 0 or epoch == end_epoch-1:
          state = {'epoch': epoch + 1, 
                   'model':model.state_dict()}
          save_file_name = 'epoch_'+str(epoch)+'_acc_'+str(val_acc)
@@ -222,4 +222,7 @@ def train_net():
    print('===> Finish Train Network with {} min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
 
 def inference():
+   return None
 
+if __name__ == '__main__':
+   train_net()

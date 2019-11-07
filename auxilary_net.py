@@ -123,6 +123,8 @@ def train_net():
    criterian = nn.CrossEntropyLoss()
 
    # Get Data 
+   # TODO need to rewrite the load data part to support our data formate 
+   '''
    print('===> Start Prepare Data')
    start_time = time.time()
 
@@ -150,6 +152,7 @@ def train_net():
 
    print('Corresponding relationship between name and idx is :', image_datasets['train'].class_to_idx)
    print('===> Finish Prepare Data with {}min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
+   '''
 
    # Get Model & Optimizer & Schedular 
    print('===> Start Training Network')

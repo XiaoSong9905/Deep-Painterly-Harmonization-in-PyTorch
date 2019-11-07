@@ -51,3 +51,6 @@ Some dataset have been found that might work for the auxilary network (network t
 
 
 [Kaggle Competation on Art style](https://www.kaggle.com/c/painter-by-numbers/data)
+
+## Getting Started with the code 
+

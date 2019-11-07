@@ -29,7 +29,7 @@ from utils import *
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-mode", help="mode for training start / resume", choices=['start', 'resume'], default='start')
-parser.add_argument("-model_file_path", help="model weight file path if mode is resume", default=None)
+parser.add_argument("-checkpoint_file", help="checkpoint pass if mode=resume", default=None)
 parser.add_argument("-data_dir", help="directory path to dataset", default='./ArtStyleData/data')
 parser.add_argument("-ann_fiile", help="file path to dataset", default='./ArtStyleData/annotation/style_train.csv')
 
@@ -38,19 +38,18 @@ parser.add_argument("-epoch", type=int, default=10)
 parser.add_argument("-batch_size", type=int, default=32)
 parser.add_argument("-momentum", type=int, default=32)
 
-parser.add_argument("-print_interval", type=int, default=100)
 parser.add_argument("-save_model_interval", type=int, default=100)
-parser.add_argument("-save_model_path", help="path to save model", default="./auxilary_model/")
+parser.add_argument("-save_checkpoint_path", help="path to save model", default="./auxilary_model/")
 parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = -1", default=-1)
 
 cfg = parser.parse_args()
 
-def build_net(mode='start', model_file_path=None):
+def build_net(mode='start', checkpoint_file=None):
    '''
    Input : 
       mode : `start` start to train network with weight getten by imagenet 
              `continue` continue training network with model weight given in file_path 
-             `eval` evaluate model output, an extra softmax layer will be added 
+             `inference` evaluate model output, an extra softmax layer will be added 
       device : if this fucntion is called by inference(), then the device type of the `main.py` program will be use 
                if this function is called by train(), then the device type of this file will be used 
    Process:
@@ -70,21 +69,26 @@ def build_net(mode='start', model_file_path=None):
 
       print('Model with ImageNet weight is build')
 
+      user_epoch = 0 
+
    elif mode == 'continue' or mode == 'eval':
       model = models.resnet18(pretrained=False)
       model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
       
-      assert(model_file_path is not None)
+      assert(checkpoint_file is not None)
       
-      user_state_dict = torch.load(model_file_path)
+      checkpoint = torch.load(checkpoint_file)
+      user_model_state_dict = checkpoint['model']
+      user_epoch = checkpoint['epoch']
+
       net_state_dict = model.state_dict()
-      user_state_dict = {k: v for k, v in user_state_dict.items() if k in net_state_dict}
-      net_state_dict.update(user_state_dict)
+      user_model_state_dict = {k: v for k, v in user_model_state_dict.items() if k in net_state_dict}
+      net_state_dict.update(user_model_state_dict)
       model.load_state_dict(net_state_dict)
 
-      print('Model with weight in `{}` is build'.format(model_file_path))
+      print('Model with weight in `{}` is build'.format(checkpoint_file))
 
-      if mode=='eval':
+      if mode=='inference':
          model = nn.Sequential(model, nn.Softmax())
          model = model.eval()
          for param in model.parameters():
@@ -92,8 +96,9 @@ def build_net(mode='start', model_file_path=None):
    else:
       # TODO raise exception error 
       model = None 
-   
-   return model 
+      user_epoch = 0
+      
+   return model, user_epoch
 
 def train_net():
    # Mostly follow the transfer learning step from here 
@@ -134,7 +139,7 @@ def train_net():
    print('===> Start Training Network')
    start_time = time.time()
 
-   model = build_net(mode=cfg.mode, model_file_path=cfg.model_file_path)
+   model, start_epoch = build_net(mode=cfg.mode, model_file_path=cfg.checkpoint_file)
    model = model.to(device)
 
    optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
@@ -144,61 +149,77 @@ def train_net():
 
    # Run epoch 
    # Model performence is evaluated every epoch 
-   for epoch in range(cfg.epoch):
-      print('Epoch {}/{}'.format(epoch, cfg.epoch - 1))
+   end_epoch = cfg.epoch
+   for epoch in range(start_epoch, end_epoch): # TODO change the epoch here to support training from middle 
+
+      # Train 
+      schedular.step()
+      model.train()
+
+      training_loss = 0.0 # For whole training dataset 
+      training_acc = 0.0 
+      
+      # Run iterator 
+      for i, (inputs, lables) in enumerate(dataloaders['train']):
+         optimizer.zero_grad()
+
+         inputs = inputs.to(device)
+         lables = lables.to(device)
+         
+         outputs = model(inputs)
+         loss = criterian(outputs, lables)
+         _, preds = torch.max(outputs, 1)
+
+         import pdb; pdb.set_trace()
+         print('lables shape', lables.shape)
+         print('outputs shape', outputs.shape)
+         print('inputs shape', inputs.shape)
+
+         loss.backward()
+         optimizer.step()
+
+         training_loss += loss.item() * inputs.shape[0]
+         training_acc += torch.sum( preds == lables.data )
+
+      
+      training_loss = training_loss / dataset_sizes['train']
+      training_acc = training_acc / dataset_sizes['train']
+
+      # Eval 
+      model.eval()
+      optimizer.zero_grad()
+
+      val_loss = 0.0 # For whole training dataset 
+      val_acc = 0.0 
+      
+      # Run iterator 
+      for i, (inputs, lables) in enumerate(dataloaders['val']):
+         inputs = inputs.to(device)
+         lables = lables.to(device)
+         
+         outputs = model(inputs)
+         loss = criterian(outputs, lables)
+         _, preds = torch.max(outputs, 1)
+
+         val_loss += loss.item() * inputs.shape[0]
+         val_acc += torch.sum( preds == lables.data )
+
+      
+      val_loss = val_loss / dataset_sizes['val']
+      val_acc = val_acc / dataset_sizes['val']
+
+      print('Epoch {}/{}; Train Loss {} Train Acc {} ;Val Loss {} Val Acc {}'.format(epoch, \
+         cfg.epoch - 1, training_loss, training_acc, val_loss, val_acc))
 
 
+      # Save Model if required 
+      if epoch % cfg.save_model_interval == 0:
+         state = {'epoch': epoch + 1, 
+                  'model':model.state_dict()}
+         save_file_name = 'epoch_'+str(epoch)+'_acc_'+str(val_acc)
+         torch.save(state, save_file_name)
 
+   print('===> Finish Train Network with {} min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
 
-'''
+def inference():
 
-使用vgg构建一个网络
-在网络的上面定义一层loss 
-定义一个trainer 
-
-如果train 就 
-     def run_step(self):
-        """
-        Implement the standard training logic described above.
-        """
-        assert self.model.training, "[SimpleTrainer] model was changed to eval mode!"
-        start = time.perf_counter()
-        """
-        If your want to do something with the data, you can wrap the dataloader.
-        """
-        data = next(self._data_loader_iter)
-        data_time = time.perf_counter() - start
-
-        """
-        If your want to do something with the losses, you can wrap the model.
-        """
-        loss_dict = self.model(data)
-        losses = sum(loss for loss in loss_dict.values())
-        self._detect_anomaly(losses, loss_dict)
-
-        metrics_dict = loss_dict
-        metrics_dict["data_time"] = data_time
-        self._write_metrics(metrics_dict)
-
-        """
-        If you need accumulate gradients or something similar, you can
-        wrap the optimizer with your custom `zero_grad()` method.
-        """
-        self.optimizer.zero_grad()
-        losses.backward()
-
-        """
-        If you need gradient clipping/scaling or other processing, you can
-        wrap the optimizer with your custom `step()` method.
-        """
-        self.optimizer.step()
- 
- 如果eval 
-    使用model,eval / 或者不apply loss， 只输出weighted score
-
-
-总结： model.train() 和 model.eval() 一般在模型训练和评价的时候会加上这两句，主要是针对由于model 在训练时和评价时 Batch Normalization 和 Dropout 方法模式不同；因此，在使用PyTorch进行训练和测试时一定注意要把实例化的model指定train/eval；
-
-
-
-'''

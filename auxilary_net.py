@@ -1,3 +1,74 @@
+# EECS 442 Final Project @ UMich 
+# No Commercial Use Allowed 
+
+# This file is organized in a structure below 
+# 1. calling this file directely `python auxilary_net.py` will train the network with choice of [start, resume] represent start to train from start / resume training 
+# 2. calling the inference function of this file will load the model specified in the argument and evaluate the input style image 
+
+import os 
+import torch 
+import torch.nn as nn 
+import torch.optim as optim 
+import torchvision.transforms as transforms 
+import torchvision.models as models
+import torchvision
+import torch.nn.functional as F 
+from PIL import Image 
+import argparse
+import copy
+import math 
+import numpy as np 
+import scipy.interpolate as interpolate
+import matplotlib.pyplot as plt
+
+
+def build_net(device, mode='start', model_file_path=None):
+   '''
+   Input : 
+      mode : `start` start to train network with weight getten by imagenet 
+             `continue` continue training network with model weight given in file_path 
+             `eval` evaluate model output, an extra softmax layer will be added 
+   Process:
+      resnet18 is used instead of vgg16 like the original paper 
+   Return :
+      model with / without softmax layer depend on the mode choice 
+         if `start` / `continue`, no softmax layer will be added, since loss is computed using CrossEntropy
+         if `eval`, softmax layer will be added
+   '''
+   if mode == 'start':
+      model = models.resnet18(pretrained=True)
+      model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
+
+      # or you can use other initialization / model's default initialization 
+      torch.nn.init.normal_(model.fc.weight.data, 0, 1)
+      torch.nn.init.normal_(model.fc.bias.data, 0, 1)
+      
+   elif mode == 'continue' or mode == 'eval':
+      model = models.resnet18(pretrained=False)
+      model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
+      
+      assert(model_file_path is not None)
+      
+      user_state_dict = torch.load(model_file_path)
+      net_state_dict = model.state_dict()
+      user_state_dict = {k: v for k, v in user_state_dict.items() if k in net_state_dict}
+      net_state_dict.update(user_state_dict)
+      model.load_state_dict(net_state_dict)
+
+      if mode=='eval':
+         model = nn.Sequential(model, nn.Softmax())
+         model = model.eval()
+         for param in model.parameters():
+            param.requires_grad = False
+   else:
+      # TODO raise exception error 
+      model = None 
+   
+   model = model.to(device)
+
+   return model 
+
+
 '''
 
 使用vgg构建一个网络

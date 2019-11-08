@@ -68,10 +68,10 @@ def pass1():
     dtype, device = setup(cfg)
 
     # Get input image and preprocess 
-    native_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device, cfg, name='read_naive_img.png')
-    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg,name='read_style_img.png')
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,name='read_tight_mask.png')
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,name='read_loss_mask.png')
+    native_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device, cfg, name='read_naive_img.png').type(dtype)
+    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg,name='read_style_img.png').type(dtype)
+    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,name='read_tight_mask.png').type(dtype)
+    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,name='read_loss_mask.png').type(dtype)
 
     # Setup Network 
     content_layers = cfg.p1_content_layers.split(',')
@@ -81,7 +81,7 @@ def pass1():
     tv_loss_list = []
 
     # Build backbone 
-    cnn, layer_list = build_backbone(cfg, device)
+    cnn, layer_list = build_backbone(cfg)
     cnn = copy.deepcopy(cnn)
 
     # Build net with loss model 
@@ -122,6 +122,8 @@ def pass1():
             style_loss_list.append(style_layer_loss)
     
     del cnn # delet unused net to save memory 
+    
+    net = net.to(device).eval()
 
     if cfg.debug_mode:
         print('===>build net')
@@ -157,10 +159,10 @@ def pass1():
 
     # Set image to be gradient updatable 
     native_img = nn.Parameter(native_img)
+    native_img = native_img.to(device)
     assert(native_img.requires_grad==True)
 
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
-        # TODO set print precition to be the same, need to convert tensor to python variable first 
         if i_iter % cfg.print_interval == 0:
             print('Iteration {} ; Content Loss {}; Style Loss {}; Total Loss {}'.format(\
                 str(i_iter), str(c_loss.item()), str(s_loss.item()), str(total_loss.item())))

@@ -155,12 +155,10 @@ def train_net():
 
    # Build Network 
    model, optimizer, schedular, start_epoch = build_net_optim_schedu(cfg, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
-   model = model.to(device)
 
    criterian = nn.CrossEntropyLoss()
 
    # Get Data 
-   
    print('===> Start Prepare Data')
    start_time = time.time()
 
@@ -191,15 +189,16 @@ def train_net():
    # Get Model & Optimizer & Schedular 
    print('===> Start Training Network')
    start_time = time.time()
+   model = model.to(device)
 
    # Run epoch 
    # Model performence is evaluated every epoch 
-   end_epoch = cfg.epoch
-   for epoch in range(start_epoch, end_epoch): # TODO change the epoch here to support training from middle 
+   num_epoch = cfg.epoch
+   for epoch in range(start_epoch, start_epoch+num_epoch): 
 
       # Train 
-      schedular.step()
       model.train()
+      schedular.step()
 
       training_loss = 0.0 # For whole training dataset 
       training_acc = 0.0 
@@ -225,30 +224,28 @@ def train_net():
 
          training_loss += loss.item() * inputs.shape[0]
          training_acc += torch.sum( preds == lables.data )
-
       
       training_loss = training_loss / dataset_sizes['train']
       training_acc = training_acc / dataset_sizes['train']
 
       # Eval 
-      # TODO see discussion notebook and see hoe to save gradient 
       model.eval()
-      optimizer.zero_grad()
 
       val_loss = 0.0 # For whole training dataset 
       val_acc = 0.0 
       
-      # Run iterator 
-      for i, (inputs, lables) in enumerate(val_dataloader):
-         inputs = inputs.to(device)
-         lables = lables.to(device)
-         
-         outputs = model(inputs)
-         loss = criterian(outputs, lables)
-         _, preds = torch.max(outputs, 1)
+      with torch.no_grad():
+         # Run iterator 
+         for i, (inputs, lables) in enumerate(val_dataloader):
+            inputs = inputs.to(device)
+            lables = lables.to(device)
+            
+            outputs = model(inputs)
+            loss = criterian(outputs, lables)
+            _, preds = torch.max(outputs, 1)
 
-         val_loss += loss.item() * inputs.shape[0]
-         val_acc += torch.sum( preds == lables.data )
+            val_loss += loss.item() * inputs.shape[0]
+            val_acc += torch.sum( preds == lables.data )
 
       
       val_loss = val_loss / dataset_sizes['val']
@@ -257,11 +254,11 @@ def train_net():
       print('Epoch {}/{}; Train Loss {} Train Acc {} ;Val Loss {} Val Acc {}'.format(epoch, \
          cfg.epoch - 1, training_loss, training_acc, val_loss, val_acc))
 
-
       # Save Model if required 
-      if epoch % cfg.save_model_interval == 0 or epoch == end_epoch-1:
+      if epoch % cfg.save_model_interval == 0 or epoch == start_epoch+num_epoch-1:
          state = {'epoch': epoch + 1, 
-                  'model':model.state_dict()}
+                  'model':model.state_dict(), 
+                  'optimizer':optimizer.state_dict()}
          save_file_name = 'epoch_'+str(epoch)+'_acc_'+str(val_acc)
          torch.save(state, save_file_name)
 
@@ -270,7 +267,7 @@ def train_net():
 def inference(device, img, checkpoint_file):
    model, _ , _, _= build_net_optim_schedu(cfg=None, mode='inference', checkpoint_file=checkpoint_file)
    model = model.to(device)
-   
+
    output = model(img)
 
    output_np = output.squeeze(0).numpy()

@@ -34,7 +34,7 @@ vgg19_dict = [
     'conv5_1',  'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'conv5_4', 'relu5_4', 'pool5'
 ]
     
-def build_backbone(cfg, device):
+def build_backbone(cfg):
     donwload_weight = True
     user_pretrained_dict = None
     if cfg.model_file is not None:
@@ -56,7 +56,7 @@ def build_backbone(cfg, device):
         net_state_dict.update(user_pretrained_dict)
         net.load_state_dict(net_state_dict)
 
-    net = net.to(device).eval() # freeze parameter, only use the feature part not classifier part 
+    net = net.eval() # freeze parameter, only use the feature part not classifier part 
     for param in net.parameters(): # set require grad to be false to save memory when capturing content and style 
         param.requires_grad = False
 

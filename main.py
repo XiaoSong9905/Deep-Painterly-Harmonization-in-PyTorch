@@ -73,6 +73,8 @@ def pass1():
     tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,name='read_tight_mask.png').type(dtype)
     loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,name='read_loss_mask.png').type(dtype)
 
+    display_masked_region(native_img, style_img, loss_mask)
+
     # Setup Network 
     content_layers = cfg.p1_content_layers.split(',')
     style_layers = cfg.p1_style_layers.split(',')
@@ -175,7 +177,7 @@ def pass1():
             if i_iter == cfg.p1_n_iters:
                 filename = output_filename + str(file_extension)
             else:
-                filename = str(output_filename) + "_iter_" + str(i_iter) + str(file_extension)
+                filename = str(output_filename) + "_iter_{0:.6f}".format(i_iter) + str(file_extension)
             img_deprocessed = img_deprocess(native_img)
 
             img_deprocessed.save(str(filename))

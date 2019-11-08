@@ -151,4 +151,17 @@ def img_deprocess(img_tensor):
 
     return img 
     
-    
+def display_masked_region(native_img, style_img, loss_mask):
+    '''
+    Input : 
+        1 * 3 * H * W 
+        1 * 1 * H * W 
+    '''   
+    native_img_masked = native_img * loss_mask.expand_as(native_img)
+    styled_img_masked = style_img * loss_mask.expand_as(style_img)
+
+    native_img_masked = img_deprocess(native_img_masked)
+    styled_img_masked = img_deprocess(styled_img_masked)
+
+    native_img_masked.save('./current_native_img_masked.png')
+    styled_img_masked.save('./current_style_img_masked.png')

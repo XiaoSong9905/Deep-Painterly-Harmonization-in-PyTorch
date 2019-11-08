@@ -124,6 +124,7 @@ def train_net():
 
    # Get Data 
    # TODO need to rewrite the load data part to support our data formate 
+   # https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
    '''
    print('===> Start Prepare Data')
    start_time = time.time()

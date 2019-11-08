@@ -78,7 +78,7 @@ def pass1():
     style_layers = cfg.p1_style_layers.split(',')
     content_loss_list = []
     style_loss_list = []
-    tv_loss = []
+    tv_loss_list = []
 
     # Build backbone 
     cnn, layer_list = build_backbone(cfg, device)

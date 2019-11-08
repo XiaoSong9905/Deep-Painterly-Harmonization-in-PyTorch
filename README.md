@@ -40,11 +40,9 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 10. (sx) Auxilary network for style loss build, need to rewrite 
 
-11. train auxilary network 
+11. (sx) train auxilary network 
 
-12. Supprot Tensorboard X
-
-12. 不需要改变数据的datatype，只需要把数据放到device上，看一下discussion的file看如何支持GPU
+12. (sx) Supprot Tensorboard X for style transform and auxilary network 
 
 ## Auxilary Network Dataset 
 

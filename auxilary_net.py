@@ -48,7 +48,7 @@ parser.add_argument("-debug_mode", type=bool, default=True)
 
 cfg = parser.parse_args()
 
-def build_net(mode='start', checkpoint_file=None):
+def build_net_optim_schedu(cfg, mode='start', checkpoint_file=None):
    '''
    Input : 
       mode : `start` start to train network with weight getten by imagenet 
@@ -64,54 +64,69 @@ def build_net(mode='start', checkpoint_file=None):
          if `eval`, softmax layer will be added
    '''
    if mode == 'start':
+
+      # Build Model 
+      print('Model with ImageNet weight is build')
       model = models.resnet18(pretrained=True)
       model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
 
-      # or you can use other initialization / model's default initialization 
-      torch.nn.init.normal_(model.fc.weight.data, 0, 1)
-      torch.nn.init.normal_(model.fc.bias.data, 0, 1)
+      #torch.nn.init.normal_(model.fc.weight.data, 0, 1)
+      #torch.nn.init.normal_(model.fc.bias.data, 0, 1)
 
-      print('Model with ImageNet weight is build')
+      # Build Optimizer 
+      optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
 
-      user_epoch = 0 
+      # Build Schedular 
+      schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-      state = {'epoch': user_epoch + 1, 
-                  'model':model.state_dict()}
-      save_file_name = 'initial_model'
-      torch.save(state, save_file_name)
+      user_epoch = 0
 
    elif mode == 'continue' or mode == 'inference':
+      
+      # Build Model 
+      assert(checkpoint_file is not None)
+      print('Model with checkpoint `{}` is build'.format(checkpoint_file))
+
       model = models.resnet18(pretrained=False)
       model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
-      
-      assert(checkpoint_file is not None)
       
       checkpoint = torch.load(checkpoint_file)
       user_model_state_dict = checkpoint['model']
       user_epoch = checkpoint['epoch']
+      user_optim_state_dict = checkpoint['optimizer']
 
+      # Fault tolerence model load 
       net_state_dict = model.state_dict()
       user_model_state_dict = {k: v for k, v in user_model_state_dict.items() if k in net_state_dict}
       net_state_dict.update(user_model_state_dict)
       model.load_state_dict(net_state_dict)
-
-      print('Model with weight in `{}` is build'.format(checkpoint_file))
 
       if mode=='inference':
          model = nn.Sequential(model, nn.Softmax(dim=0))
          model = model.eval()
          for param in model.parameters():
             param.requires_grad = False
-   else:
-      # TODO raise exception error 
-      model = None 
-      user_epoch = 0
+            
+         optimizer = None 
+         schedular = None 
 
-   return model, user_epoch
+      else:
+         # Build optimizer 
+         optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
+         optimizer.load_state_dict(user_optim_state_dict)
+         
+         # Build Schedular 
+         schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
+   # Build Optimizer 
+
+
+   return model, optimizer, schedular, user_epoch
 
 class ArtDataset(Dataset):
     def __init__(self, csv_file, data_root_dir, transform=None):
         self.dataframe = pd.read_csv(csv_file)
+        # self.dataframe['file'][idx] : Impressionism/edgar-degas_dancers-on-set-1880.jpg
         self.data_root_dir = data_root_dir
         self.transform = transform # depend on argument, either transform for train or val 
         
@@ -124,7 +139,7 @@ class ArtDataset(Dataset):
         '''
         img_file = os.path.join(self.data_root_dir, self.dataframe['file'][idx])
         img = Image.open(img_file)
-        lable = seld.dataframe['cat'][idx]
+        lable = self.dataframe['cat'][idx]
         
         if self.transform:
             img = self.transform(img)
@@ -139,17 +154,12 @@ def train_net():
    dtype, device = setup(cfg)
 
    # Build Network 
-   model, start_epoch = build_net(mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
+   model, optimizer, schedular, start_epoch = build_net_optim_schedu(cfg, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
    model = model.to(device)
-
-   optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
-   schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
    criterian = nn.CrossEntropyLoss()
 
    # Get Data 
-   # TODO need to rewrite the load data part to support our data formate 
-   # https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
    
    print('===> Start Prepare Data')
    start_time = time.time()
@@ -195,7 +205,7 @@ def train_net():
       training_acc = 0.0 
       
       # Run iterator 
-      for i, (inputs, lables) in enumerate(dataloaders['train']):
+      for i, (inputs, lables) in enumerate(train_dataloader):
          optimizer.zero_grad()
 
          inputs = inputs.to(device)
@@ -221,6 +231,7 @@ def train_net():
       training_acc = training_acc / dataset_sizes['train']
 
       # Eval 
+      # TODO see discussion notebook and see hoe to save gradient 
       model.eval()
       optimizer.zero_grad()
 
@@ -228,7 +239,7 @@ def train_net():
       val_acc = 0.0 
       
       # Run iterator 
-      for i, (inputs, lables) in enumerate(dataloaders['val']):
+      for i, (inputs, lables) in enumerate(val_dataloader):
          inputs = inputs.to(device)
          lables = lables.to(device)
          
@@ -257,8 +268,9 @@ def train_net():
    print('===> Finish Train Network with {} min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
 
 def inference(device, img, checkpoint_file):
-   model, _ = build_net('inference', checkpoint_file=checkpoint_file)
+   model, _ , _, _= build_net_optim_schedu(cfg=None, mode='inference', checkpoint_file=checkpoint_file)
    model = model.to(device)
+   
    output = model(img)
 
    output_np = output.squeeze(0).numpy()

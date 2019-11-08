@@ -177,7 +177,7 @@ def pass1():
             if i_iter == cfg.p1_n_iters:
                 filename = output_filename + str(file_extension)
             else:
-                filename = str(output_filename) + "_iter_{0:.6f}".format(i_iter) + str(file_extension)
+                filename = str(output_filename) + "_iter_{0:08d}".format(i_iter) + str(file_extension)
             img_deprocessed = img_deprocess(native_img)
 
             img_deprocessed.save(str(filename))
@@ -204,6 +204,8 @@ def pass1():
         periodic_save(i_iter)
     
     optimizer = build_optimizer(cfg, native_img)
+    # TODO 
+    # Addd schedular for this model, the output doesn't seem to converge 
     i_iter = 0
     while i_iter <= cfg.p1_n_iters:
         optimizer.step(closure)

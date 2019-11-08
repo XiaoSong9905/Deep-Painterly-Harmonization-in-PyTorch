@@ -14,6 +14,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 import torchvision.datasets as datasets
 import torchvision
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F 
 from PIL import Image 
 import argparse
@@ -23,6 +24,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time 
+import pandas as pd 
 
 from utils import * 
 
@@ -31,7 +33,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-mode", help="mode for training start / resume", choices=['start', 'resume'], default='start')
 parser.add_argument("-checkpoint_file", help="checkpoint pass if mode=resume", default=None)
 parser.add_argument("-data_dir", help="directory path to dataset", default='./ArtStyleData/data')
-parser.add_argument("-ann_fiile", help="file path to dataset", default='./ArtStyleData/annotation/style_train.csv')
+parser.add_argument("-ann_fiile", help="relative file path to dataset", default='./ArtStyleData/annotation/style_train.csv')
 
 parser.add_argument("-lr", type=float, default=1e-1)
 parser.add_argument("-epoch", type=int, default=10)
@@ -107,6 +109,29 @@ def build_net(mode='start', checkpoint_file=None):
 
    return model, user_epoch
 
+class ArtDataset(Dataset):
+    def __init__(self, csv_file, data_root_dir, transform=None):
+        self.dataframe = pd.read_csv(csv_file)
+        self.data_root_dir = data_root_dir
+        self.transform = transform # depend on argument, either transform for train or val 
+        
+    def __len__(self):
+        return len(self.dataframe)
+    
+    def __getitem__(self, idx):
+        '''
+        Get lable and image for `idx \in [0, self.__len__]
+        '''
+        img_file = os.path.join(self.data_root_dir, self.dataframe['file'][idx])
+        img = Image.open(img_file)
+        lable = seld.dataframe['cat'][idx]
+        
+        if self.transform:
+            img = self.transform(img)
+        
+        return img, lable 
+        
+
 def train_net():
    # Mostly follow the transfer learning step from here 
    # https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html 
@@ -125,7 +150,7 @@ def train_net():
    # Get Data 
    # TODO need to rewrite the load data part to support our data formate 
    # https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
-   '''
+   
    print('===> Start Prepare Data')
    start_time = time.time()
 
@@ -143,18 +168,16 @@ def train_net():
       ]),
    }
 
-   # Each Type of data is stored in corresponding folder, this is not true for all the data you may get but is true in this case 
-   image_datasets = {x: datasets.ImageFolder(os.path.join(cfg.data_dir, x),
-                                             data_transforms[x]) for x in ['train', 'val']}
-   dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=cfg.batch_size,
-                                                shuffle=True, num_workers=4) for x in ['train', 'val']}
-   dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-   class_names = image_datasets['train'].classes
+   train_dataset = ArtDataset(cfg.ann_fiile, cfg.data_dir, data_transforms['train'])
+   val_dataset = ArtDataset(cfg.ann_fiile, cfg.data_dir, data_transforms['val'])
 
-   print('Corresponding relationship between name and idx is :', image_datasets['train'].class_to_idx)
+   train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=4)
+   val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False, num_workers=4)
+
+   dataset_sizes = {'train':len(train_dataset), 'val':len(val_dataset)}
+
    print('===> Finish Prepare Data with {}min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
-   '''
-
+   
    # Get Model & Optimizer & Schedular 
    print('===> Start Training Network')
    start_time = time.time()

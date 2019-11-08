@@ -42,6 +42,9 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 11. train auxilary network 
 
+12. Supprot Tensorboard X
+
+12. 不需要改变数据的datatype，只需要把数据放到device上，看一下discussion的file看如何支持GPU
 
 ## Auxilary Network Dataset 
 
@@ -57,4 +60,5 @@ Some dataset have been found that might work for the auxilary network (network t
 [Kaggle Competation on Art style](https://www.kaggle.com/c/painter-by-numbers/data)
 
 ## Getting Started with the code 
+
 

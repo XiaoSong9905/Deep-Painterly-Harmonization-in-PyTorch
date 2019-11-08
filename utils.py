@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 def setup(cfg):
     # TODO set up a check for image size, there should be a lower bound on how small the image should be 
 
-    if cfg.gpu == -1:
+    if cfg.gpu == 'cpu':
         dtype, device = torch.FloatTensor, "cpu"
     else:
         dtype, device = torch.cuda.FloatTensor, "cuda:"+str(cfg.gpu)

@@ -41,7 +41,7 @@ parser.add_argument("-p2_n_iters", type=int, default=1000)
 parser.add_argument("-print_interval", type=int, default=100)
 parser.add_argument("-save_img_interval", type=int, default=100)
 parser.add_argument("-log_interval", type=int, default=100)
-parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = -1", default=-1)
+parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
 
 # Model Parameter 
 parser.add_argument("-p1_content_layers", help="layers for content", default='relu4_2')

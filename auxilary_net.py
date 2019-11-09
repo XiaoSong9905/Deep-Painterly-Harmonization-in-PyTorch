@@ -143,8 +143,9 @@ class ArtDataset(Dataset):
         try:
            img = Image.open(img_file)
         except Exception as e:
-            idx = idx - 1 if idx > 0 else idx + 1 
-            return self.__getitem__(idx)
+           print('dataset idx {} invalid'.format(idx))
+           idx = idx - 1 if idx > 0 else idx + 1 
+           return self.__getitem__(idx)
 
         lable = self.dataframe['cat'][idx]
         
@@ -174,13 +175,13 @@ def train_net():
 
    data_transforms = {
       'train': transforms.Compose([
-         transforms.RandomResizedCrop(300),
+         transforms.Resize((300, 300)),
          transforms.RandomHorizontalFlip(),
          transforms.ToTensor(),
          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # TODO recheck this normalization parameter 
       ]),
       'val': transforms.Compose([
-         transforms.Resize(300),
+         transforms.Resize((300, 300))),
          transforms.ToTensor(),
          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
       ]),

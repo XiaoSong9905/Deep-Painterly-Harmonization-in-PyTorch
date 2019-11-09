@@ -16,7 +16,7 @@ import torchvision.datasets as datasets
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F 
-from PIL import Image 
+from PIL import Image, ImageFile
 import argparse
 import copy
 import math 
@@ -28,6 +28,8 @@ import pandas as pd
 from tensorboardX import SummaryWriter 
 
 from utils import * 
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 parser = argparse.ArgumentParser()
 
@@ -244,7 +246,7 @@ def train_net():
 
          # Save model per inteval 
          if niter % cfg.save_model_iter_interval == 0:
-            state = {'epoch': epoch + 1, 
+            state = {'epoch': epoch, 
                      'iter': i+1,
                      'model':model.state_dict(), 
                      'optimizer':optimizer.state_dict()}

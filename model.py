@@ -133,9 +133,8 @@ class GramMatrix(nn.Module):
     ! Gram Matrix is not complicated thing, it's just covariance matrix 
     '''
 
-    def __init__(self, is_normalize=True):
+    def __init__(self):
         super(GramMatrix, self).__init__()
-        self.is_normalize=is_normalize
 
     def forward(self, input):
         '''
@@ -149,10 +148,7 @@ class GramMatrix(nn.Module):
         output = torch.zeros((B, C, C))
         for i in range(B):
             fm_flat = input[i].view(C, H * W)
-            tmp_gram = torch.mm(fm_flat, fm_flat.t())
-            if self.is_normalize:
-                tmp_gram /= (H*W*C)
-            output[i] = tmp_gram
+            output[i] = torch.mm(fm_flat, fm_flat.t())
 
         return output
 

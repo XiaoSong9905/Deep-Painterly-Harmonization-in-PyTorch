@@ -42,7 +42,7 @@ parser.add_argument("-epoch", type=int, default=10)
 parser.add_argument("-batch_size", type=int, default=32)
 parser.add_argument("-momentum", type=int, default=0.9)
 
-parser.add_argument("-print_iteration_interval", type=int, default=10)
+parser.add_argument("-print_iteration_interval", type=int, default=100)
 parser.add_argument("-save_model_iter_interval", type=int, default=100)
 parser.add_argument("-save_checkpoint_path", help="path to save model", default="./auxilary_model/")
 parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
@@ -82,7 +82,7 @@ def build_net_optimizer_schedular(cfg, mode='start', checkpoint_file=None):
 
       user_epoch = 0
 
-   elif mode == 'continue' or mode == 'inference':
+   elif mode == 'resume' or mode == 'inference':
       
       # Build Model 
       assert(checkpoint_file is not None)

@@ -20,13 +20,13 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 ## TODO 
 
-1. StyleLossPass2 
+1. (zw, dd) StyleLossPass2 
 
 2. (sx) StyleLossPass1 [DONE]
 
 3. (sx) Pass 1 debug & test validation [DONE]
 
-4. pass 2 (should be similar to pass 1 except broadcating the match relation between different layer)
+4. (zw, dd) Pass 2 (should be similar to pass 1 except broadcating the match relation between different layer)
 
 5. (sx) notebook for bp work on mask area [DONE]
 
@@ -34,7 +34,7 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 7. (sx) need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. [DONE]
 
-8. TVLoss module 
+8. (zw)TVLoss module [DONE]
 
 9. code update to support GPU setting, some job is done but not all. need to run on google colab to check GPU support 
 
@@ -43,6 +43,8 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 11. (sx) train auxilary network 
 
 12. (sx) Supprot Tensorboard X for style transform and auxilary network 
+
+13. (zw) Code formatting 
 
 ## Auxilary Network Dataset 
 

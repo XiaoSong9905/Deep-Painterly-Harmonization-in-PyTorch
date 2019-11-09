@@ -51,7 +51,7 @@ parser.add_argument("-debug_mode", type=bool, default=True)
 
 cfg = parser.parse_args()
 
-def build_net_optimizer_schedular(cfg, mode='start', checkpoint_file=None):
+def build_net_optimizer_schedular(cfg, device, mode='start', checkpoint_file=None):
    '''
    Input : 
       mode : `start` start to train network with weight getten by imagenet 
@@ -91,7 +91,7 @@ def build_net_optimizer_schedular(cfg, mode='start', checkpoint_file=None):
       model = models.resnet18(pretrained=False)
       model.fc = nn.Linear(in_features=512, out_features=27, bias=True)
       
-      checkpoint = torch.load(checkpoint_file)
+      checkpoint = torch.load(checkpoint_file, map_location=device)
       user_model_state_dict = checkpoint['model']
       user_epoch = checkpoint['epoch']
       user_optim_state_dict = checkpoint['optimizer']
@@ -114,7 +114,7 @@ def build_net_optimizer_schedular(cfg, mode='start', checkpoint_file=None):
       else:
          # Build optimizer 
          optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
-         optimizer.load_state_dict(user_optim_state_dict)
+         #optimizer.load_state_dict(user_optim_state_dict)
       
          # Build Schedular 
          schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
@@ -138,7 +138,12 @@ class ArtDataset(Dataset):
         Get lable and image for `idx \in [0, self.__len__]
         '''
         img_file = os.path.join(self.data_root_dir, self.dataframe['file'][idx])
-        img = Image.open(img_file)
+        try:
+           img = Image.open(img_file)
+        except Exception as e:
+            idx = idx - 1 if idx > 0 else idx + 1 
+            return self.__getitem__(idx)
+
         lable = self.dataframe['cat'][idx]
         
         if self.transform:
@@ -157,7 +162,7 @@ def train_net():
    writer = SummaryWriter('log')
 
    # Build Network 
-   model, optimizer, schedular, start_epoch = build_net_optimizer_schedular(cfg, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
+   model, optimizer, schedular, start_epoch = build_net_optimizer_schedular(cfg, device, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
 
    criterian = nn.CrossEntropyLoss()
 

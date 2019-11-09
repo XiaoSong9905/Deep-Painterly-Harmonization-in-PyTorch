@@ -73,6 +73,8 @@ def build_backbone(cfg):
     return net, layer_list
 
 
+
+# Ziyan use class in order to match the format in this script. However, a function may better.
 class TVLoss(nn.Module):
     def __init__(self, tv_weight):
         super(TVLoss, self).__init__()
@@ -123,6 +125,7 @@ class ContentLoss(nn.Module):
         return input
 
 
+# Why use class here? Ziyan and Deyang think a function should be fine.
 class GramMatrix(nn.Module):
     '''
     Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
@@ -240,6 +243,8 @@ class StyleLossPass1(nn.Module):
         n_patch_h = math.floor(style_fm_masked.shape[2] / 3)  # use math package to avoid potential python2 issue
         n_patch_w = math.floor(style_fm_masked.shape[3] / 3)
 
+        # Deyang and Ziyan ask why here stride is 3 instead of 1? the original code use 1.
+        # Original Code location: neural_gram line 134, stride = 1
         stride = self.match_patch_size
         patch_size = self.match_patch_size
 
@@ -277,8 +282,15 @@ class StyleLossPass2(StyleLossPass1):
     child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
     '''
 
-    def __init__(self):
+    def __init__(self, style_weight):
         super(StyleLossPass2, self).__init__()
+        # TODO
 
     def forward(self):
+        return None
+
+    def match_fm(self, style_fm, img_fm, ref_layer_idx):
+        # after conv, normalize, loc: cuda_utils line 1260
+        
+
         return None

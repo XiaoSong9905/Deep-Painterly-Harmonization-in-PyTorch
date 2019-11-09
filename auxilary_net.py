@@ -25,6 +25,7 @@ import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time 
 import pandas as pd 
+from tensorboardX import SummaryWriter 
 
 from utils import * 
 
@@ -33,35 +34,35 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-mode", help="mode for training start / resume", choices=['start', 'resume'], default='start')
 parser.add_argument("-checkpoint_file", help="checkpoint pass if mode=resume", default=None)
 parser.add_argument("-data_dir", help="directory path to dataset", default='./ArtStyleData/data')
-parser.add_argument("-ann_fiile", help="relative file path to dataset", default='./ArtStyleData/annotation/style_train.csv')
+parser.add_argument("-train_ann_file", help="relative file path to dataset", default='./ArtStyleData/annotation/style_train.csv')
+parser.add_argument("-val_ann_file", help="relative file path to dataset", default='./ArtStyleData/annotation/style_val.csv')
 
-parser.add_argument("-lr", type=float, default=1e-1)
+parser.add_argument("-lr", type=float, default=1e-3)
 parser.add_argument("-epoch", type=int, default=10)
 parser.add_argument("-batch_size", type=int, default=32)
-parser.add_argument("-momentum", type=int, default=32)
+parser.add_argument("-momentum", type=int, default=0.9)
 
-parser.add_argument("-save_model_interval", type=int, default=100)
+parser.add_argument("-print_iteration_interval", type=int, default=10)
+parser.add_argument("-save_model_iter_interval", type=int, default=100)
 parser.add_argument("-save_checkpoint_path", help="path to save model", default="./auxilary_model/")
-parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = -1", default=-1)
+parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
 
 parser.add_argument("-debug_mode", type=bool, default=True)
 
 cfg = parser.parse_args()
 
-def build_net_optim_schedu(cfg, mode='start', checkpoint_file=None):
+def build_net_optimizer_schedular(cfg, mode='start', checkpoint_file=None):
    '''
    Input : 
       mode : `start` start to train network with weight getten by imagenet 
              `continue` continue training network with model weight given in file_path 
              `inference` evaluate model output, an extra softmax layer will be added 
-      device : if this fucntion is called by inference(), then the device type of the `main.py` program will be use 
-               if this function is called by train(), then the device type of this file will be used 
    Process:
       resnet18 is used instead of vgg16 like the original paper 
    Return :
       model with / without softmax layer depend on the mode choice 
          if `start` / `continue`, no softmax layer will be added, since loss is computed using CrossEntropy
-         if `eval`, softmax layer will be added
+         if `inference`, softmax layer will be added
    '''
    if mode == 'start':
 
@@ -114,22 +115,21 @@ def build_net_optim_schedu(cfg, mode='start', checkpoint_file=None):
          # Build optimizer 
          optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=cfg.momentum)
          optimizer.load_state_dict(user_optim_state_dict)
-         
+      
          # Build Schedular 
          schedular = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
-   # Build Optimizer 
-
 
    return model, optimizer, schedular, user_epoch
 
 class ArtDataset(Dataset):
     def __init__(self, csv_file, data_root_dir, transform=None):
-        self.dataframe = pd.read_csv(csv_file)
+        self.dataframe = pd.read_csv(csv_file, header=None, names=['file', 'cat'])
         # self.dataframe['file'][idx] : Impressionism/edgar-degas_dancers-on-set-1880.jpg
         self.data_root_dir = data_root_dir
         self.transform = transform # depend on argument, either transform for train or val 
         
+        print('===> ArtDataset with csv file [{}] and data root [{}] build'.format(csv_file, data_root_dir))
+
     def __len__(self):
         return len(self.dataframe)
     
@@ -153,8 +153,11 @@ def train_net():
 
    dtype, device = setup(cfg)
 
+   # Set up TensorboardX
+   writer = SummaryWriter('log')
+
    # Build Network 
-   model, optimizer, schedular, start_epoch = build_net_optim_schedu(cfg, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
+   model, optimizer, schedular, start_epoch = build_net_optimizer_schedular(cfg, mode=cfg.mode, checkpoint_file=cfg.checkpoint_file)
 
    criterian = nn.CrossEntropyLoss()
 
@@ -176,16 +179,17 @@ def train_net():
       ]),
    }
 
-   train_dataset = ArtDataset(cfg.ann_fiile, cfg.data_dir, data_transforms['train'])
-   val_dataset = ArtDataset(cfg.ann_fiile, cfg.data_dir, data_transforms['val'])
+   train_dataset = ArtDataset(cfg.train_ann_file, cfg.data_dir, data_transforms['train'])
+   val_dataset = ArtDataset(cfg.val_ann_file, cfg.data_dir, data_transforms['val'])
 
-   train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=4)
-   val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False, num_workers=4)
+   train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=0) # On MACOS, set num_workers=0, on unix, set nun_workers=4
+   val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False, num_workers=0)
 
    dataset_sizes = {'train':len(train_dataset), 'val':len(val_dataset)}
-
-   print('===> Finish Prepare Data with {}min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
    
+   time_elapsed = time.time() - start_time
+   print('===> Finish Prepare Data with time{:.0f}m {:.04f}s'.format(time_elapsed // 60, time_elapsed % 60))
+
    # Get Model & Optimizer & Schedular 
    print('===> Start Training Network')
    start_time = time.time()
@@ -195,16 +199,15 @@ def train_net():
    # Model performence is evaluated every epoch 
    num_epoch = cfg.epoch
    for epoch in range(start_epoch, start_epoch+num_epoch): 
-
       # Train 
       model.train()
-      schedular.step()
-
       training_loss = 0.0 # For whole training dataset 
       training_acc = 0.0 
       
       # Run iterator 
       for i, (inputs, lables) in enumerate(train_dataloader):
+         niter = epoch * len(train_dataloader) + i 
+
          optimizer.zero_grad()
 
          inputs = inputs.to(device)
@@ -214,19 +217,41 @@ def train_net():
          loss = criterian(outputs, lables)
          _, preds = torch.max(outputs, 1)
 
-         import pdb; pdb.set_trace()
-         print('lables shape', lables.shape)
-         print('outputs shape', outputs.shape)
-         print('inputs shape', inputs.shape)
+         #print('lables shape', lables.shape)
+         #print('outputs shape', outputs.shape)
+         #print('inputs shape', inputs.shape)
+         # lables shape torch.Size([32])
+         # outputs shape torch.Size([32, 27])
+         # inputs shape torch.Size([32, 3, 300, 300])
 
          loss.backward()
          optimizer.step()
 
          training_loss += loss.item() * inputs.shape[0]
          training_acc += torch.sum( preds == lables.data )
-      
+
+         if i % cfg.print_iteration_interval == 0:
+            print('Epoch {:2d} Iteration {:4d} loss {:.05f}'.format(epoch, i, loss.item()))
+         
+         # Record train loss for tensorboard x
+         if i % 10 == 0:
+            writer.add_scalar('Train/Loss', loss.item(), niter)
+
+         # Save model per inteval 
+         if niter % cfg.save_model_iter_interval == 0:
+            state = {'epoch': epoch + 1, 
+                     'iter': i+1,
+                     'model':model.state_dict(), 
+                     'optimizer':optimizer.state_dict()}
+            save_file_name = 'epoch_'+str(epoch)+'_iter_'+str(i)+'_loss_'+str(loss.item())
+            torch.save(state, save_file_name)
+
       training_loss = training_loss / dataset_sizes['train']
       training_acc = training_acc / dataset_sizes['train']
+
+      writer.add_scalar('Train/Epoch_Acc', training_acc, epoch)
+
+      schedular.step()
 
       # Eval 
       model.eval()
@@ -251,21 +276,35 @@ def train_net():
       val_loss = val_loss / dataset_sizes['val']
       val_acc = val_acc / dataset_sizes['val']
 
-      print('Epoch {}/{}; Train Loss {} Train Acc {} ;Val Loss {} Val Acc {}'.format(epoch, \
-         cfg.epoch - 1, training_loss, training_acc, val_loss, val_acc))
+      # Tensorboard X  
+      writer.add_scalar('Test/Epoch_Acc', val_acc, epoch)
+      writer.add_scalar('Test/Epoch_Loss', val_loss, epoch)
 
-      # Save Model if required 
-      if epoch % cfg.save_model_interval == 0 or epoch == start_epoch+num_epoch-1:
-         state = {'epoch': epoch + 1, 
-                  'model':model.state_dict(), 
-                  'optimizer':optimizer.state_dict()}
-         save_file_name = 'epoch_'+str(epoch)+'_acc_'+str(val_acc)
-         torch.save(state, save_file_name)
+      time_elapsed = time.time() - start_time
+      print('Epoch {}/{}; Train Loss {:.05f} Train Acc {:.05f} ;Val Loss {:.05f} Val Acc {:.05f} Time {:.0f}m {:.04f}s'.format(epoch, \
+         cfg.epoch - 1, training_loss, training_acc, val_loss, val_acc, time_elapsed // 60, time_elapsed % 60))
 
-   print('===> Finish Train Network with {} min {} second'.format(str( (time.time()-start_time)//60 ), (time.time()-start_time)%60 ) )
+      # Save Model every epoch 
+      state = {'epoch': epoch + 1, 
+               'iter': -1,
+               'model':model.state_dict(), 
+               'optimizer':optimizer.state_dict()}
+      save_file_name = 'epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc)
+      torch.save(state, save_file_name)
+
+   time_elapsed = time.time() - start_time
+   print('===> Finish Train Network with time {:.0f}m {:.04f}s'.format(time_elapsed // 60, time_elapsed % 60))
+
+   # Save Model after training 
+   state = {'epoch': epoch + 1, 
+            'iter': -1,
+            'model':model.state_dict(), 
+            'optimizer':optimizer.state_dict()}
+   save_file_name = 'final_epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc)
+   torch.save(state, save_file_name)
 
 def inference(device, img, checkpoint_file):
-   model, _ , _, _= build_net_optim_schedu(cfg=None, mode='inference', checkpoint_file=checkpoint_file)
+   model, _ , _, _= build_net_optimizer_schedular(cfg=None, mode='inference', checkpoint_file=checkpoint_file)
    model = model.to(device)
 
    output = model(img)

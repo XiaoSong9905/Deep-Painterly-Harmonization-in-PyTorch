@@ -87,10 +87,10 @@ def preprocess(cfg):
 
     display_masked_region(native_img, style_img, loss_mask)
 
-    return native_img, style_img, tight_mask, loss_mask
+    return native_img, style_img, tight_mask, loss_mask, device
 
 
-def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device):
+def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device, net):
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
             print('Iteration {} ; Content Loss {}; Style Loss {}; Total Loss {}'.format(
@@ -141,7 +141,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device
     return native_img
 
 
-def pass1(cfg, native_img, style_img, tight_mask, loss_mask):
+def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     # Setup Network 
     content_layers = cfg.p1_content_layers.split(',')
     style_layers = cfg.p1_style_layers.split(',')
@@ -232,7 +232,7 @@ def pass1(cfg, native_img, style_img, tight_mask, loss_mask):
     native_img = native_img.to(device)
     assert (native_img.requires_grad == True)
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device)
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device, net)
     print('===>deep painterly harmonization pass 1 is done')
     return native_img
 
@@ -245,8 +245,8 @@ def pass2():
 
 def main():
     cfg = get_args()
-    native_img, style_img, tight_mask, loss_mask = preprocess(cfg)
-    pass1(cfg, native_img, style_img, tight_mask, loss_mask)
+    native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
+    pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
     # pass2
     return
 

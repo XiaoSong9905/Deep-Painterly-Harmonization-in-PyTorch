@@ -75,6 +75,7 @@ def build_backbone(cfg):
 
 
 # Ziyan use class in order to match the format in this script. However, a function may better.
+# Xiao : the reason to use a class is to able to put the TVLoss class into the network that can forward, backward by simply model(img), loss.backward()
 class TVLoss(nn.Module):
     def __init__(self, tv_weight):
         super(TVLoss, self).__init__()
@@ -245,6 +246,7 @@ class StyleLossPass1(nn.Module):
 
         # Deyang and Ziyan ask why here stride is 3 instead of 1? the original code use 1.
         # Original Code location: neural_gram line 134, stride = 1
+        # TODO sx change the stride to 1 and support new feature map 
         stride = self.match_patch_size
         patch_size = self.match_patch_size
 

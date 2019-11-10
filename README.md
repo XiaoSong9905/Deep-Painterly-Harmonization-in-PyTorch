@@ -38,9 +38,9 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 9. code update to support GPU setting, some job is done but not all. need to run on google colab to check GPU support 
 
-10. (sx) Auxilary network for style loss build, need to rewrite 
+10. (sx) Auxilary network for style loss build, need to rewrite [DONE]
 
-11. (sx) train auxilary network 
+11. (sx) train auxilary network [NEED TO CHECK WITH DAVID ON CONVERGENCE PROBLEM]
 
 12. (sx) Supprot Tensorboard X for style transform and auxilary network 
 

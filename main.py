@@ -90,16 +90,16 @@ def preprocess(cfg):
     return native_img, style_img, tight_mask, loss_mask, device
 
 
-def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device, net):
+def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net):
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
-            print('Iteration {} ; Content Loss {}; Style Loss {}; Total Loss {}'.format(
-                str(i_iter), str(c_loss.item()), str(s_loss.item()), str(total_loss.item())))
+            print('Iteration {} ; Content Loss {:.06f}; Style Loss {:.06f}; Total Loss {:.06f}'.format(
+                str(i_iter), c_loss.item(), s_loss.item(), total_loss.item() ) )
 
     def periodic_save(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters)
         if flag:
-            print('===>save image at iteration {}'.format(str(i_iter)))
+            print('===> Save image at iteration {}'.format(str(i_iter)))
             output_filename, file_extension = os.path.splitext(cfg.p1_output_img)
             if i_iter == cfg.p1_n_iters:
                 filename = output_filename + str(file_extension)
@@ -115,16 +115,21 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device
         _ = net(native_img)
         c_loss = 0
         s_loss = 0
+        tv_loss = 0
         total_loss = 0
 
         for i in content_loss_list:
             c_loss += i.loss.to(device)
         for i in style_loss_list:
             s_loss += i.loss.to(device)
+        if cfg.tv_weight > 0:
+            for i in tv_loss_list:
+                tv_loss += i.loss.to(device)
 
-        total_loss = s_loss + c_loss
+        total_loss = s_loss + c_loss + tv_loss
         total_loss.backward()
 
+        # After computing gradient w.r.t img, only update gradient on the masked region of img 
         native_img.grad = native_img.grad * loss_mask.expand_as(native_img)
 
         periodic_print(i_iter, c_loss, s_loss, total_loss)
@@ -158,9 +163,13 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     mask = loss_mask
 
     if cfg.debug_mode:
-        print('===>build net with loss module')
+        print('\n===> Build net with loss module')
 
     # TODO in order to save computation time, only use the cnn untile the last layer of style / content loss 
+    if cfg.tv_weight > 0:
+        tv_loss = TVLoss(cfg.tv_weight)
+        net.add_module(str(len(net)), tv_loss)
+        tv_loss_list.append(tv_loss)
 
     for i, layer in enumerate(list(cnn)):
         if isinstance(layer, nn.Conv2d):
@@ -196,11 +205,10 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     net = net.to(device).eval()
 
     if cfg.debug_mode:
-        print('===>build net')
-        print('net is', net)
+        print(net)
     # import pdb; pdb.set_trace()
 
-    print('===>capture content fm')
+    print('\n===> Start Capture Content FM')
     # Go pass the net to capture information we need 
     for i in content_loss_list:
         i.mode = 'capture'
@@ -209,14 +217,18 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     net(native_img)
 
     # import pdb; pdb.set_trace()
-    print('===>capture style fm & compute match and style gram')
+    print('\n===> Start Capture Style FM & Compute Match & Compute Gram Matrix')
+    start_time = time.time()
+    
     for i in content_loss_list:
         i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'capture_style'
     net(style_img)
+    
+    time_elapsed = time.time() - start_time
+    print('<===Finish with time {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    print('===>reset network to loss mode and freeze parameter')
     # reset the model to loss mode 
     for i in content_loss_list:
         i.mode = 'loss'
@@ -232,8 +244,14 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     native_img = native_img.to(device)
     assert (native_img.requires_grad == True)
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device, net)
-    print('===>deep painterly harmonization pass 1 is done')
+    print('\n===> Start Updating Image')
+    start_time = time.time()
+
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net)
+
+    time_elapsed = time.time() - start_time
+    print('<===Finish with time {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+
     return native_img
 
 

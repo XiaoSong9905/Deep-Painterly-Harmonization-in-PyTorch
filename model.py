@@ -81,18 +81,22 @@ class TVLoss(nn.Module):
         super(TVLoss, self).__init__()
         self.weight = tv_weight
 
-    def forward(self, img):
+    def forward(self, input):
         '''
-        img: pytorch variable of shape (1,C,H,W)
-        returns: tv loss
+        Input : 
+            input: pytorch variable represent img of shape (1,3,H,W)
+        Return :
+            input 
+        Process:
+            compute loss, save loss as part of TVLoss member element (so it's not released after forward pass)
         '''
         #####################
         # Formula: $L_{tv} = w_t \times \left(\sum_{c=1}^3\sum_{i=1}^{H-1}\sum_{j=1}^{W} (x_{i+1,j,c} - x_{i,j,c})^2 + \sum_{c=1}^3\sum_{i=1}^{H}\sum_{j=1}^{W - 1} (x_{i,j+1,c} - x_{i,j,c})^2\right)$
         #####################
-        tmp_h = torch.sum((img[:, :, 1:, :] - img[:, :, :-1, :]) ** 2)
-        tmp_w = torch.sum((img[:, :, :, 1:] - img[:, :, :, :-1]) ** 2)
+        tmp_h = torch.sum((input[:, :, 1:, :] - input[:, :, :-1, :]) ** 2)
+        tmp_w = torch.sum((input[:, :, :, 1:] - input[:, :, :, :-1]) ** 2)
         self.loss = self.weight * (tmp_h + tmp_w)
-        return self.loss
+        return input
 
 
 class ContentLoss(nn.Module):
@@ -235,9 +239,8 @@ class StyleLossPass1(nn.Module):
             style_fm_masked : 1 * C * H * W
 
         '''
-        since = time.time()
-        # TODO set a time count on how long it takes to compute the match 
-        print('===>StyleLossPass1 Start to match feature map')
+        #since = time.time()
+        #print('StyleLossPass1 Start to match feature map')
 
         # Create a copy of style image fm (to matain size)
         style_fm_masked = style_fm.clone()  # create a copy of the same size
@@ -272,9 +275,9 @@ class StyleLossPass1(nn.Module):
 
         assert (style_fm_masked.shape == img_fm.shape)
 
-        time_elapsed = time.time() - since
-        print('===>StyleLossPass1 Finish matching feature map with time{:.0f}m {:.0f}s'.format(time_elapsed // 60,
-                                                                                               time_elapsed % 60))
+        #time_elapsed = time.time() - since
+        #print('StyleLossPass1 Finish matching feature map with time{:.04f}m {:.04f}s'.format(time_elapsed // 60,
+        #                                                                                       time_elapsed % 60))
 
         return style_fm_masked
 

@@ -71,8 +71,7 @@ def get_args():
     return cfg
 
 
-def preprocess():
-    cfg = get_args()
+def preprocess(cfg):
     # Set up device and datatye
     dtype, device = setup(cfg)
 
@@ -142,7 +141,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, device
     return native_img
 
 
-def pass1(native_img, style_img, tight_mask, loss_mask):
+def pass1(cfg, native_img, style_img, tight_mask, loss_mask):
     # Setup Network 
     content_layers = cfg.p1_content_layers.split(',')
     style_layers = cfg.p1_style_layers.split(',')
@@ -245,8 +244,9 @@ def pass2():
 
 
 def main():
-    native_img, style_img, tight_mask, loss_mask = preprocess()
-    pass1(native_img, style_img, tight_mask, loss_mask)
+    cfg = get_args()
+    native_img, style_img, tight_mask, loss_mask = preprocess(cfg)
+    pass1(cfg, native_img, style_img, tight_mask, loss_mask)
     # pass2
     return
 

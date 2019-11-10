@@ -30,6 +30,7 @@ from tensorboardX import SummaryWriter
 from utils import * 
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+Image.MAX_IMAGE_PIXELS = 1000000000                                                                                              
 
 parser = argparse.ArgumentParser()
 
@@ -297,7 +298,7 @@ def train_net():
                'iter': -1,
                'model':model.state_dict(), 
                'optimizer':optimizer.state_dict()}
-      save_file_name = 'epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc)
+      save_file_name = 'epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc.item())
       torch.save(state, save_file_name)
 
    time_elapsed = time.time() - start_time
@@ -308,7 +309,7 @@ def train_net():
             'iter': -1,
             'model':model.state_dict(), 
             'optimizer':optimizer.state_dict()}
-   save_file_name = 'final_epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc)
+   save_file_name = 'final_epoch_'+str(epoch)+'_iter_'+str(i)+'_acc_'+str(val_acc.item())
    torch.save(state, save_file_name)
 
 def inference(device, img, checkpoint_file):

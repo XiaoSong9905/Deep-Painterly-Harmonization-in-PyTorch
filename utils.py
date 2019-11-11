@@ -190,3 +190,15 @@ def conv2d_same_padding(input, filter, stride=1):
         input = F.pad(input, [0, int(cols_odd), 0, int(rows_odd)])
 
     return F.conv2d(input, filter, stride, padding=(padding_rows // 2, padding_cols // 2))
+
+
+def get_patch(feature, pos_h, pos_w, patch_size=3):
+    '''
+    :param feature: 1 * C * H * W
+    :param pos_h:
+    :param pos_w:
+    :param patch_size:
+    :return: patch: 1 * C * patch_size * patch_size
+    '''
+    dx = (patch_size - 1) // 2
+    return feature[:, :, pos_h - dx : pos_h + dx, pos_w - dx : pos_w + dx]

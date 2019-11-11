@@ -17,7 +17,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time
-from utils import conv2d_same_padding
+from utils import conv2d_same_padding, get_patch
 
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'pool1',
@@ -296,6 +296,7 @@ class StyleLossPass2(StyleLossPass1):
         return None
 
     def consistent_mapping(self, style_fm_dict, img_fm_dict, ref_layer='conv4_1'):
+        # TODO conv4_1 or relu4_1?
         # after conv, normalize, loc: cuda_utils line 1260
 
         '''
@@ -308,7 +309,7 @@ class StyleLossPass2(StyleLossPass1):
             style_fm_masked_dict: dict, style_fm_masked_dict[layer_i] = 1 * C_i * H_i * W_i
         '''
 
-        mapping = {} # {key(layer_name): value(NearestNeighborIndex = H_i * W_i)}
+        mapping = None # NearestNeighborIndex for ref_layer: H_ref * W_ref
         mapping_out = {}
         stride = 1 #TODO
         patch_size = 3 # TODO
@@ -333,7 +334,7 @@ class StyleLossPass2(StyleLossPass1):
                 score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
                 ref_mapping[i, j] = torch.argmax(score_map).item()
 
-        mapping[ref_layer] = ref_mapping
+        mapping = ref_mapping
 
         # Step 2: Enforce spatial consistency.
         for i in range(n_patch_h):
@@ -347,8 +348,8 @@ class StyleLossPass2(StyleLossPass1):
                         if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                             continue
 
-                        patch_idx = mapping[ref_layer][i + di, j + dj]
-                        patch_pos = (int(patch_idx / n_patch_w) - di, int(patch_idx % n_patch_w) - dj)
+                        patch_idx = mapping[i + di, j + dj]
+                        patch_pos = (patch_idx // n_patch_w - di, patch_idx % n_patch_w - dj)
 
                         if patch_pos[0] < 0 \
                                 or patch_pos[0] >= n_patch_h \
@@ -356,9 +357,25 @@ class StyleLossPass2(StyleLossPass1):
                                 or patch_pos[1] >= n_patch_w:
                             continue
 
-                        candidate_set.add(patch_pos[0] * n_patch_w + patch_pos[1])
+                        candidate_set.add((patch_pos[0], patch_pos[1]))
 
                 # Select the candidate the most similar to the style patches
                 # associated to the neighbors of p.
+                min_sum = 0
+                for c_h, c_w in candidate_set:
+                    sum = 0
+                    for di in [-1, 0, 1]:
+                        for dj in [-1, 0, 1]:
+                            patch_idx = mapping[i + di, j + dj]
+                            patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
+                            style_fm_ref_c = get_patch(style_fm_ref, c_h, c_w, patch_size)
+                            style_fm_ref_p = get_patch(style_fm_ref, patch_pos[0], patch_pos[1], patch_size)
+                            sum += F.conv2d(style_fm_ref_c, style_fm_ref_p)
+
+                    if sum < min_sum:
+                        min_sum = sum
+                        mapping_out[ref_layer][i, j] = c_h * n_patch_w + c_w
+
+        # Step 3: Propagate the matches in the ref. layer to the other layers.
 
         return None

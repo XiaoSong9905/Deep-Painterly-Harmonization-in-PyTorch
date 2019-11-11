@@ -216,12 +216,12 @@ def train_net():
          transforms.Resize((300, 300)),
          transforms.RandomHorizontalFlip(),
          transforms.ToTensor(),
-         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # TODO recheck this normalization parameter 
+         transforms.Normalize( [0.5220, 0.4686, 0.4041],[0.1701, 0.1727, 0.1799]) 
       ]),
       'val': transforms.Compose([
          transforms.Resize((300, 300)),
          transforms.ToTensor(),
-         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+         transforms.Normalize( [0.5220, 0.4686, 0.4041],[0.1701, 0.1727, 0.1799])
       ]),
    }
 

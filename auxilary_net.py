@@ -135,7 +135,7 @@ class ArtDataset(Dataset):
         print('===> ArtDataset with csv file [{}] and data root [{}] build'.format(csv_file, data_root_dir))
 
     def __len__(self):
-        return len(self.dataframe) // 10
+        return len(self.dataframe)
     
     def __getitem__(self, idx):
         '''

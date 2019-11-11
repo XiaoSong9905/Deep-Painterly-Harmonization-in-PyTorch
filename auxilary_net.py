@@ -51,6 +51,7 @@ parser.add_argument("-save_checkpoint_path", help="path to save model", default=
 parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
 
 parser.add_argument("-debug_mode", type=bool, default=True)
+parser.add_argument("-compute_dataset", type=bool, default=False)
 
 cfg = parser.parse_args()
 
@@ -134,7 +135,7 @@ class ArtDataset(Dataset):
         print('===> ArtDataset with csv file [{}] and data root [{}] build'.format(csv_file, data_root_dir))
 
     def __len__(self):
-        return len(self.dataframe)
+        return len(self.dataframe) // 10
     
     def __getitem__(self, idx):
         '''
@@ -142,6 +143,7 @@ class ArtDataset(Dataset):
         '''
         img_file = os.path.join(self.data_root_dir, self.dataframe['file'][idx])
         try:
+           #print(img_file)
            img = Image.open(img_file)
         except Exception as e:
            print('dataset idx {} invalid'.format(idx))
@@ -154,7 +156,42 @@ class ArtDataset(Dataset):
             img = self.transform(img)
         
         return img, lable 
-        
+
+def compute_dataset_mean_std():
+   '''
+   Simplified version of finding dataset mean, std 
+
+   `Var(X) = E[(X - E(X))^2] - E(X^2) - E(X)^2`
+   `std = var**0.5`
+   `E(X^2) = 1/N \sum_{i=0}^N (x_i)`
+   '''
+
+   transform = transforms.Compose([
+         transforms.Resize((300, 300)),
+         transforms.ToTensor()
+   ])
+
+   train_dataset = ArtDataset(cfg.train_ann_file, cfg.data_dir, transform)
+   train_dataloader = DataLoader(train_dataset, batch_size=1000, shuffle=False, num_workers=0) # On MACOS, set num_workers=0, on unix, set nun_workers=4
+
+   mean = 0.0 
+   meansq = 0.0 
+   std = 0.0 
+
+   print('===> Start Iteration')
+   for i, (data, _ ) in enumerate(train_dataloader):
+      data = data.view(data.shape[0], data.shape[1], -1)
+      mean += data.mean(2).sum(0)
+      meansq += (data.mean(2)**2).sum(0)
+
+      if i % 2 == 0:
+         print('Iteration {}'.format(i))
+
+   mean = mean / len(train_dataset) 
+   meansq = meansq / len(train_dataset) 
+   std = (meansq - mean**2)**0.5 
+
+   print('mean : ', mean, '; std : ', std)
 
 def train_net():
    # Mostly follow the transfer learning step from here 
@@ -313,7 +350,7 @@ def train_net():
    torch.save(state, save_file_name)
 
 def inference(device, img, checkpoint_file):
-   model, _ , _, _= build_net_optimizer_schedular(cfg=None, mode='inference', checkpoint_file=checkpoint_file)
+   model, _ , _, _= build_net_optimizer_schedular(cfg=None, device=device, mode='inference', checkpoint_file=checkpoint_file)
    model = model.to(device)
 
    output = model(img)
@@ -335,6 +372,7 @@ def inference(device, img, checkpoint_file):
    return style_loss_weight_final, tv_loss_weight_final
 
 if __name__ == '__main__':
-   train_net()
-   #img = torch.rand((1, 3, 300, 300))
-   #inference('cpu', img, checkpoint_file='./initial_model')
+   if cfg.compute_dataset:
+      compute_dataset_mean_std()
+   else:
+      train_net()

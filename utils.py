@@ -134,7 +134,8 @@ def img_preprocess(img_file, out_shape, dtype, device, cfg, name='img_preprocess
         save_img_plt(img, name)
 
     return img
-    
+
+
 def img_deprocess(img_tensor):
     '''
     Input : 
@@ -150,7 +151,8 @@ def img_deprocess(img_tensor):
     img = transforms.ToPILImage()(img_tensor)
 
     return img 
-    
+
+
 def display_masked_region(native_img, style_img, loss_mask):
     '''
     Input : 
@@ -165,3 +167,26 @@ def display_masked_region(native_img, style_img, loss_mask):
 
     native_img_masked.save('./current_native_img_masked.png')
     styled_img_masked.save('./current_style_img_masked.png')
+
+
+def conv2d_same_padding(input, filter, stride=1):
+    '''
+    :param input: 1 * C * H * W
+    :param filter: 1 * C * F * F
+    :param stride:
+    :return: output: 1 * C * H * W
+    '''
+    _, _, H, W = input.shape
+    F = filter.shape[2]
+
+    out_rows = (H + stride - 1) // stride
+    padding_rows = max(0, (out_rows - 1) * stride + F - H)
+    rows_odd = (padding_rows % 2 != 0)
+    out_cols = (W + stride - 1) // stride
+    padding_cols = max(0, (out_cols - 1) * stride + F - W)
+    cols_odd = (padding_rows % 2 != 0)
+
+    if rows_odd or cols_odd:
+        input = F.pad(input, [0, int(cols_odd), 0, int(rows_odd)])
+
+    return F.conv2d(input, filter, stride, padding=(padding_rows // 2, padding_cols // 2))

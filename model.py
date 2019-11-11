@@ -17,6 +17,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time
+from utils import conv2d_same_padding
 
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'pool1',
@@ -271,7 +272,7 @@ class StyleLossPass1(nn.Module):
                                                                               1] + 1) * patch_size]  # matched have shape 1 * C * 3 * 3
 
                 style_fm_masked[:, :, i * patch_size:(i + 1) * patch_size,
-                j * patch_size:(j + 1) * patch_size] = matched_style_patch
+                    j * patch_size:(j + 1) * patch_size] = matched_style_patch
 
         assert (style_fm_masked.shape == img_fm.shape)
 
@@ -294,8 +295,70 @@ class StyleLossPass2(StyleLossPass1):
     def forward(self):
         return None
 
-    def match_fm(self, style_fm, img_fm, ref_layer_idx):
+    def consistent_mapping(self, style_fm_dict, img_fm_dict, ref_layer='conv4_1'):
         # after conv, normalize, loc: cuda_utils line 1260
-        
+
+        '''
+        Input :
+            style_fm_dict: dict, style_fm_dict[layer_i] = 1 * C_i * H_i * W_i
+            img_fm_dict: dict, img_fm_dict[layer_i] = 1 * C_i * H_i * W_i
+            ref_layer: str, the name of the reference layer, default='conv4_1'
+
+        Output:
+            style_fm_masked_dict: dict, style_fm_masked_dict[layer_i] = 1 * C_i * H_i * W_i
+        '''
+
+        mapping = {} # {key(layer_name): value(NearestNeighborIndex = H_i * W_i)}
+        mapping_out = {}
+        stride = 1 #TODO
+        patch_size = 3 # TODO
+
+        # Step 1: Find matches for the reference layer.
+        style_fm_ref = style_fm_dict[ref_layer]
+        img_fm_ref = img_fm_dict[ref_layer]
+        ref_h = style_fm_ref.shape[2]
+        ref_w = style_fm_ref.shape[3]
+        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1
+        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1
+        ref_mapping = np.zeros(ref_h, ref_w)
+
+        for i in range(n_patch_h):
+            for j in range(n_patch_w):
+                # Each kernal represent a patch in content fm
+                kernel = img_fm_ref[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
+
+                # Compute score map for each content fm patch
+                score_map = conv2d_same_padding(style_fm_ref, kernel, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
+                assert (score_map.shape == style_fm_ref.shape)
+                score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
+                ref_mapping[i, j] = torch.argmax(score_map).item()
+
+        mapping[ref_layer] = ref_mapping
+
+        # Step 2: Enforce spatial consistency.
+        for i in range(n_patch_h):
+            for j in range(n_patch_w):
+                # Initialize a set of candidate style patches.
+                candidate_set = set()
+
+                # For all adjacent patches, look up the corresponding style patch.
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
+                            continue
+
+                        patch_idx = mapping[ref_layer][i + di, j + dj]
+                        patch_pos = (int(patch_idx / n_patch_w) - di, int(patch_idx % n_patch_w) - dj)
+
+                        if patch_pos[0] < 0 \
+                                or patch_pos[0] >= n_patch_h \
+                                or patch_pos[1] < 0 \
+                                or patch_pos[1] >= n_patch_w:
+                            continue
+
+                        candidate_set.add(patch_pos[0] * n_patch_w + patch_pos[1])
+
+                # Select the candidate the most similar to the style patches
+                # associated to the neighbors of p.
 
         return None

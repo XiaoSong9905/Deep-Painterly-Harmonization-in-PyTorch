@@ -46,6 +46,51 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 13. (zw) Code formatting 
 
+## Getting Started with the code 
+
+* Dependency 
+
+```shell
+torch >= 1.3.1 
+torhchvision >= 0.4.1 
+```
+
+* Run on local computer with default setting 
+
+By default
+
+1. output image is stored under `output` directory 
+2. output image shape is 64 
+3. `0_target.jpg`, `0_naive.jpg` is used 
+
+```python
+python3 main.py
+```
+
+* Run on GPU setting like google colab 
+
+```python
+python3 main.py -gpu 0
+```
+
+* Run with specified style and content image 
+
+```python
+python3 main.py -style_image ./data/1_target.jpg \
+        -native_image ./data/1_naive.jpg \
+        -tight_mask data/1_c_mask.jpg \
+        -dilated_mask data/1_c_mask_dilated.jpg
+```
+
+* Run with specified iteration, lr, etc 
+
+```python
+python3 main.py -lr 1e-1 -p1_n_iters 2000 -p2_n_iters 1000 
+```
+
+For more information on how to specify training process, check `main.py -> get_args()` 
+
+
 ## Auxilary Network Dataset 
 
 Some dataset have been found that might work for the auxilary network (network that pick the weight of loss)
@@ -55,10 +100,4 @@ Some dataset have been found that might work for the auxilary network (network t
 * [dataset download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart.zip)
 
 * [annotation download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart_csv.zip)  (use the style data part)
-
-
-[Kaggle Competation on Art style](https://www.kaggle.com/c/painter-by-numbers/data)
-
-## Getting Started with the code 
-
 

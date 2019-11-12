@@ -1,0 +1,141 @@
+Deep Painterly Harmonization log file
+    '===>' : Begin of Specific Stage 
+    '' : Sub-operation inside stage 
+    '@' : Time Spend in that stage
+
+===> Configuration Setup
+device cpu
+dtype <class 'torch.FloatTensor'>
+
+===> Build Backbone Network with vgg16
+Sequential(
+  (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (1): ReLU(inplace=True)
+  (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (3): ReLU(inplace=True)
+  (4): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (5): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (6): ReLU(inplace=True)
+  (7): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (8): ReLU(inplace=True)
+  (9): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (10): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (11): ReLU(inplace=True)
+  (12): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (13): ReLU(inplace=True)
+  (14): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (15): ReLU(inplace=True)
+  (16): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (17): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (18): ReLU(inplace=True)
+  (19): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (20): ReLU(inplace=True)
+  (21): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (22): ReLU(inplace=True)
+  (23): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (24): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (25): ReLU(inplace=True)
+  (26): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (27): ReLU(inplace=True)
+  (28): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (29): ReLU(inplace=True)
+  (30): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+)
+
+===> Build Network with Backbone & Loss Module
+Add TVLoss at Position 0
+Add Style Loss at Position 3
+Add Style Loss at Position 9
+Add Style Loss at Position 15
+Add Style Loss at Position 23
+Add Content Loss at Position 26
+Add Style Loss at Position 32
+Sequential(
+  (0): TVLoss()
+  (1): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (2): ReLU(inplace=True)
+  (3): StyleLossPass1(
+    (critertain): MSELoss()
+    (gram): GramMatrix()
+  )
+  (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (5): ReLU(inplace=True)
+  (6): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (7): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (8): ReLU(inplace=True)
+  (9): StyleLossPass1(
+    (critertain): MSELoss()
+    (gram): GramMatrix()
+  )
+  (10): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (11): ReLU(inplace=True)
+  (12): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (13): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (14): ReLU(inplace=True)
+  (15): StyleLossPass1(
+    (critertain): MSELoss()
+    (gram): GramMatrix()
+  )
+  (16): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (17): ReLU(inplace=True)
+  (18): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (19): ReLU(inplace=True)
+  (20): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (21): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (22): ReLU(inplace=True)
+  (23): StyleLossPass1(
+    (critertain): MSELoss()
+    (gram): GramMatrix()
+  )
+  (24): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (25): ReLU(inplace=True)
+  (26): ContentLoss(
+    (criterian): MSELoss()
+  )
+  (27): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (28): ReLU(inplace=True)
+  (29): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+  (30): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (31): ReLU(inplace=True)
+  (32): StyleLossPass1(
+    (critertain): MSELoss()
+    (gram): GramMatrix()
+  )
+  (33): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (34): ReLU(inplace=True)
+  (35): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (36): ReLU(inplace=True)
+  (37): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+)
+
+===> Start Capture Content Image Feature Map
+StyleLossPass1 content feature map with shape torch.Size([1, 64, 62, 64]) captured
+StyleLossPass1 content feature map with shape torch.Size([1, 128, 31, 32]) captured
+StyleLossPass1 content feature map with shape torch.Size([1, 256, 15, 16]) captured
+StyleLossPass1 content feature map with shape torch.Size([1, 512, 7, 8]) captured
+ContentLoss content feature map with shape torch.Size([1, 512, 7, 8]) captured
+StyleLossPass1 content feature map with shape torch.Size([1, 512, 3, 4]) captured
+
+===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix
+StyleLossPass1 style feature map with shape torch.Size([1, 64, 62, 64]) captured
+StyleLossPass1 compute match relation
+StyleLossPass1 compute style gram matrix
+StyleLossPass1 style feature map with shape torch.Size([1, 128, 31, 32]) captured
+StyleLossPass1 compute match relation
+StyleLossPass1 compute style gram matrix
+StyleLossPass1 style feature map with shape torch.Size([1, 256, 15, 16]) captured
+StyleLossPass1 compute match relation
+StyleLossPass1 compute style gram matrix
+StyleLossPass1 style feature map with shape torch.Size([1, 512, 7, 8]) captured
+StyleLossPass1 compute match relation
+StyleLossPass1 compute style gram matrix
+StyleLossPass1 style feature map with shape torch.Size([1, 512, 3, 4]) captured
+StyleLossPass1 compute match relation
+StyleLossPass1 compute style gram matrix
+@ Time Spend : 0.0000 m 0.2647 s
+
+===> Start Updating Image
+Iteration 00000000 ; Content Loss 0.000000; Style Loss 3186386.750000; Total Loss 3216773.250000
+Iteration 00000000 Save Intermediate IMG
+Iteration 00000010 Save Intermediate IMG
+@ Time Spend 0.0000 m 1.2301 s

@@ -16,20 +16,35 @@ import math
 import numpy as np 
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
+import sys 
 
+def init_log():
+    orig_stdout = sys.stdout
+    sys.stdout = open('log.txt','w')
+
+    message = "Deep Painterly Harmonization log file\n\
+    \'===>\' : Begin of Specific Stage \n\
+    \'\' : Sub-operation inside stage \n\
+    \'@\' : Time Spend in that stage"
+
+    print(message)
+    return orig_stdout
+
+def end_log(orig_stdout):
+    sys.stdout.close()
+    sys.stdout=orig_stdout 
 
 def setup(cfg):
-    # TODO set up a check for image size, there should be a lower bound on how small the image should be 
 
     if cfg.gpu == 'cpu':
         dtype, device = torch.FloatTensor, "cpu"
     else:
         dtype, device = torch.cuda.FloatTensor, "cuda:"+str(cfg.gpu)
 
-    if cfg.debug_mode:
-        print('===>setup()')
-        print('device', device)
-        print('dtype', dtype)
+    
+    print('\n===> Configuration Setup')
+    print('device', device)
+    print('dtype', dtype)
 
     return dtype, device
 
@@ -55,9 +70,9 @@ def save_img_plt(img, path, gray=False):
     '''
     Input : 1 * 1 * H * W / 1 * 3 * H * W Tensor 
     '''
-    print('===>save image')
-    print(path)
-    print('img shape', img.shape)
+    #print('===>save image')
+    #print(path)
+    #print('img shape', img.shape)
 
     img = img.cpu().numpy()
     img = img * 255 
@@ -95,12 +110,13 @@ def mask_preprocess(mask_file, out_shape, dtype, device, cfg, name='mask_preproc
     mask[mask != 0] = 1
     mask = mask.unsqueeze(0)
 
-    if cfg.debug_mode:
-        print('===>mask_preprocess')
-        print('for {}'.format(str(mask_file)))
-        print('output range : ', (torch.min(mask), torch.max(mask)))
-        print('output shape : ', mask.shape)
-        save_img_plt(mask, name, gray=True)
+    '''
+    print('===>mask_preprocess')
+    print('for {}'.format(str(mask_file)))
+    print('output range : ', (torch.min(mask), torch.max(mask)))
+    print('output shape : ', mask.shape)
+    save_img_plt(mask, name, gray=True)
+    '''
 
     return mask 
 
@@ -126,12 +142,13 @@ def img_preprocess(img_file, out_shape, dtype, device, cfg, name='img_preprocess
     img = img.type(dtype)
     img = img.unsqueeze(0)
 
-    if cfg.debug_mode:
-        print('===>img_preprocess')
-        print('for {}'.format(str(img_file)))
-        print('output range : ', (torch.min(img), torch.max(img)))
-        print('output shape : ', img.shape)
-        save_img_plt(img, name)
+    '''
+    print('===>img_preprocess')
+    print('for {}'.format(str(img_file)))
+    print('output range : ', (torch.min(img), torch.max(img)))
+    print('output shape : ', img.shape)
+    save_img_plt(img, name)
+    '''
 
     return img
 

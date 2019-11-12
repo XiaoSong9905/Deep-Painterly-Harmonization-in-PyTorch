@@ -39,6 +39,8 @@ vgg19_dict = [
 def build_backbone(cfg):
     donwload_weight = True
     user_pretrained_dict = None
+
+    # Build Model with user specific weight 
     if cfg.model_file is not None:
         user_pretrained_dict = torch.load(cfg.model_file)
         donwload_weight = False
@@ -48,31 +50,28 @@ def build_backbone(cfg):
     elif cfg.model == 'vgg19':
         net, layer_list = models.vgg19(pretrained=donwload_weight).features, vgg19_dict
     else:
-        # TODO change to raise error 
         return None
 
+    # User Specific Weight 
     if user_pretrained_dict is not None:
         net_state_dict = net.state_dict()
         user_pretrained_dict = {k: v for k, v in user_pretrained_dict.items() if k in net_state_dict}
-        # TODO need to raise information for which layer weigth have been added 
         net_state_dict.update(user_pretrained_dict)
         net.load_state_dict(net_state_dict)
 
-    net = net.eval()  # freeze parameter, only use the feature part not classifier part
-    for param in net.parameters():  # set require grad to be false to save memory when capturing content and style
+    # Freeze Parameter, only update img not net parameter 
+    # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
+    net = net.eval() 
+    for param in net.parameters(): 
         param.requires_grad = False
 
-    # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
-
-    # if cfg.debug_mode:
-    #    print('===>build model')
-    #    print('cnn backbone is', net)
+    print('\n===> Build Backbone Network with {}'.format(cfg.model))
+    print(net)
 
     assert (net.training == False)
     assert (len(net) == len(layer_list))
 
     return net, layer_list
-
 
 
 # Ziyan use class in order to match the format in this script. However, a function may better.
@@ -109,21 +108,29 @@ class ContentLoss(nn.Module):
         self.mode = 'None'
 
     def forward(self, input):
+        '''
+        Process:
+            1. before update image, `self.mode = 'capture'` will be set to capture content image feature map and save 
+            2. during update image, `self.mode = 'loss'` will be set to compute loss and pass `input` to the next module
+        '''
         if self.mode == 'capture':
-            # Capture 
+            # Capture Feature Map
             self.content_fm = input.detach()
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.content_fm)
-            print('ContentLoss Mask is resize to {}'.format(str(self.mask.shape)))
+            self.mask = self.mask.expand_as(self.content_fm) # 1 * 1 * H * W -> 1 * C * H * W 
 
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
-                # Complex Module do not support `register_backward_tensor()`
-                # Simple solution to mask gradient is to register hook on variable 
+                '''
+                Functionality : 
+                    Return Gradient only over masked region
+                Notice : 
+                    Variable hook is used in this case, Module hook is not supported for `complex moule` 
+                '''
                 return torch.mul(grad, self.mask)
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
@@ -131,12 +138,10 @@ class ContentLoss(nn.Module):
         return input
 
 
-# Why use class here? Ziyan and Deyang think a function should be fine.
 class GramMatrix(nn.Module):
     '''
     Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
     To understand how gram matrix work, checkout `understand Gram Matrix` notebook 
-    ! Gram Matrix is not complicated thing, it's just covariance matrix 
     '''
 
     def __init__(self):
@@ -145,13 +150,13 @@ class GramMatrix(nn.Module):
     def forward(self, input):
         '''
         Input : 
-            input (represent feature map) : B * C * H * W 
+            input: 1 * C * H * W, represent feature map 
         Output : 
-            gram : B * (C * C) 
-                   when batch size is 1, then output shape 1 * C * C 
+            output : 1 * (C * C), represent gram matrix 
         '''
         B, C, H, W = input.shape
         output = torch.zeros((B, C, C))
+
         for i in range(B):
             fm_flat = input[i].view(C, H * W)
             output[i] = torch.mm(fm_flat, fm_flat.t())
@@ -160,75 +165,64 @@ class GramMatrix(nn.Module):
 
 
 class StyleLossPass1(nn.Module):
-    '''
-    Process:
-        1. pass style image and record style image feature map 
-        2. pass naive stich image and record content image feature map 
-            (we use naive stich image and content image interchanable in this project)
-        3. use two saved feature map compute match for patch inside mask on style image 
-        4. compute gramma matrix for the matched 3D matrix (from style image) and save 
-            4.1 this gramm matrix only correspond to the masked region 
-        5. During iteration, compute gramma matrix for img for areas under mask 
-        6. record the loss between two gramm matrix and output the input (since the loss is build as part of the network)
-        7. use closure() for optimizer to cumulate all the loss and do loss.backward()
-    '''
-
     def __init__(self, style_weight, layer_mask, match_patch_size):
         super(StyleLossPass1, self).__init__()
         self.weight = style_weight
-        self.critertain = nn.MSELoss()  # TODO check the implementation using MSELoss and gram matrix match the one in papaer
+        self.critertain = nn.MSELoss() 
         self.gram = GramMatrix()
-
         self.mask = layer_mask.clone()
-        self.style_fm = None  # Store the styled image's feature map C * H * W
-        self.img_fm = None  # Store the naive stich image's feature map
-        self.style_gram = None  # gram matrix of style image under the mask constrain (1 * C * C)
-
         self.mode = 'None'
         self.loss = None
         self.match_patch_size = match_patch_size
 
     def forward(self, input):
-        if self.mode == 'capture_style':
-            # Capture Style is done after capture content 
+        '''
+        Process:
+            1. Before update image
+                1.1 First set `self.mode = 'capture_content'` to capture content feature map & expanded mask to corresponding size 
+                1.2 Then set `self.mode = 'capture_style'` to capture style feature map & compute match relation between 
+                    style feature map and content feature map & compute style image gram matrix under masked region
+            2. During update image, set `self.mode = 'loss'` to compute loss between content image gram matrix and stle image gram matrix 
+               & return input
+        '''
+        # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
+        if self.mode == 'capture_style': #
             style_fm = input.detach()
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
-            # Compute Style Gram Matrix 
-            style_fm_matched = self.match_fm(style_fm, self.img_fm)
+            # Compute Match 
+            style_fm_matched = self.match_fm(style_fm, self.content_fm)
+            print('StyleLossPass1 compute match relation')
+
+            # Compute Gram Matrix 
             style_fm_matched_masked = torch.mul(style_fm_matched, self.mask)
-            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(
-                self.mask)  # See Gatys `2.2. Style representation` to see how style loss defined over gram matrix
-            print(
-                'StyleLossPass1 style gram matrix under mask with shape {}'.format(str(self.style_matched_gram.shape)))
+            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask) 
+            print('StyleLossPass1 compute style gram matrix')
 
-            # Delete unused variable to save memory, we only need the matched gram matrix 
-            del self.img_fm
+            del self.content_fm
             del style_fm
-
+        
+        # Step 1 : Capture Content Feature Map  
         elif self.mode == 'capture_content':
-            # Capture Content fm first, since we need content image fm when initialize the match during style match 
-            self.img_fm = input.detach()
-            print('StyleLossPass1 img (naive stich) feature map with shape {} captured'.format(str(self.img_fm.shape)))
+            self.content_fm = input.detach()
+            print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.img_fm)
-            print('StyleLossPass1 mask expand to shape {}'.format(str(self.mask.shape)))
+            self.mask = self.mask.expand_as(self.content_fm)
 
+        # Step 3 : during updateing image 
         elif self.mode == 'loss':
-            # input in this case is the naive stiched image's fm 
             self.img_gram = self.gram(torch.mul(input, self.mask))
             self.img_gram = self.img_gram / torch.sum(self.mask)
             self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
 
-        # If None, do nothing 
         return input
 
-    def match_fm(self, style_fm, img_fm):
+    def match_fm(self, style_fm, content_fm):
         '''
         Input : 
-            style_fm, img_fm : 1 * C * H * W
-
+            style_fm : 1 * C * H * W 
+            content_fm : 1 * C * H * W
         Process:
             Instead of only compute the match for pixel inside the mask, here we compute the 
                 match for the whole feature map and use mask to filter out the matched pixel we don't need 
@@ -238,49 +232,41 @@ class StyleLossPass1(nn.Module):
         
         Output:
             style_fm_masked : 1 * C * H * W
+                Step1 : compute corresponding feature map for whole content img feature map 
+                Step2 : masked the matched feature map
 
         '''
-        #since = time.time()
-        #print('StyleLossPass1 Start to match feature map')
+        style_fm_matched = style_fm.clone() 
+        n_patch_h = math.floor(style_fm_matched.shape[2] / 3)  # use math package to avoid potential python2 issue
+        n_patch_w = math.floor(style_fm_matched.shape[3] / 3)
 
-        # Create a copy of style image fm (to matain size)
-        style_fm_masked = style_fm.clone()  # create a copy of the same size
-        n_patch_h = math.floor(style_fm_masked.shape[2] / 3)  # use math package to avoid potential python2 issue
-        n_patch_w = math.floor(style_fm_masked.shape[3] / 3)
-
-        # Deyang and Ziyan ask why here stride is 3 instead of 1? the original code use 1.
-        # Original Code location: neural_gram line 134, stride = 1
-        # TODO sx change the stride to 1 and support new feature map 
-        stride = self.match_patch_size
+        stride = 3
         patch_size = self.match_patch_size
 
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # Each kernal represent a patch in content fm 
-                kernal = img_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
+                kernal = content_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
 
-                # Compute score map for each content fm patch 
-                score_map = F.conv2d(style_fm, kernal, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
-                score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
+                # Compute score map for each content fm patch kernal 
+                score_map = F.conv2d(style_fm, kernal, stride=stride)  
+                score_map = score_map[0, 0, :, :]  # 1 * 1 * n_patch_h * n_patch_w ->  1 * 1 * n_patch_h * n_patch_w
+
+                # Find Maximal idx output score map 
                 idx = torch.argmax(score_map).item()
                 matched_style_idx = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
 
-                # Find matched patch 
-                matched_style_patch = style_fm[:, :,
+                # Find matched patch in style fm 
+                matched_style_patch = style_fm[:, :, 
                                       matched_style_idx[0] * patch_size: (matched_style_idx[0] + 1) * patch_size, \
-                                      matched_style_idx[1] * patch_size: (matched_style_idx[
-                                                                              1] + 1) * patch_size]  # matched have shape 1 * C * 3 * 3
+                                      matched_style_idx[1] * patch_size: (matched_style_idx[1] + 1) * patch_size]  
+                                      #  1 * C * 3 * 3
 
-                style_fm_masked[:, :, i * patch_size:(i + 1) * patch_size,
-                    j * patch_size:(j + 1) * patch_size] = matched_style_patch
+                style_fm_matched[:, :, 
+                            i * patch_size:(i + 1) * patch_size,
+                            j * patch_size:(j + 1) * patch_size] = matched_style_patch
 
-        assert (style_fm_masked.shape == img_fm.shape)
-
-        #time_elapsed = time.time() - since
-        #print('StyleLossPass1 Finish matching feature map with time{:.04f}m {:.04f}s'.format(time_elapsed // 60,
-        #                                                                                       time_elapsed % 60))
-
-        return style_fm_masked
+        return style_fm_matched
 
 
 class StyleLossPass2(StyleLossPass1):

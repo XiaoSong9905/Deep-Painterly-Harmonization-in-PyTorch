@@ -281,7 +281,7 @@ class StyleLossPass2(StyleLossPass1):
     def forward(self):
         return None
 
-    def consistent_mapping(self, style_fm_dict, img_fm_dict, ref_layer='conv4_1'):
+    def consistent_mapping(self, style_fm_dict, img_fm_dict, layers, ref_layer='relu4_1'):
         # TODO conv4_1 or relu4_1?
         # after conv, normalize, loc: cuda_utils line 1260
 
@@ -347,14 +347,14 @@ class StyleLossPass2(StyleLossPass1):
 
                 # Select the candidate the most similar to the style patches
                 # associated to the neighbors of p.
-                min_sum = 0
+                min_sum = np.inf
                 for c_h, c_w in candidate_set:
+                    style_fm_ref_c = get_patch(style_fm_ref, c_h, c_w, patch_size)
                     sum = 0
                     for di in [-1, 0, 1]:
                         for dj in [-1, 0, 1]:
                             patch_idx = mapping[i + di, j + dj]
                             patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
-                            style_fm_ref_c = get_patch(style_fm_ref, c_h, c_w, patch_size)
                             style_fm_ref_p = get_patch(style_fm_ref, patch_pos[0], patch_pos[1], patch_size)
                             sum += F.conv2d(style_fm_ref_c, style_fm_ref_p)
 
@@ -363,5 +363,46 @@ class StyleLossPass2(StyleLossPass1):
                         mapping_out[ref_layer][i, j] = c_h * n_patch_w + c_w
 
         # Step 3: Propagate the matches in the ref. layer to the other layers.
+        # TODO define layers
+        for layer in layers:
+            if layer == ref_layer:
+                continue
 
-        return None
+            _, _, n_curr_h, n_curr_w = style_fm_dict[layer].shape
+            patch_mask = np.zeros(n_patch_h, n_patch_w)
+
+        return mapping_out
+
+
+    def match_fm_ref(self, style_fm, img_fm):
+        '''
+        Input :
+            style_fm: 1 * C * H * W, reference layer style feature map
+            img_fm: 1 * C * H * W, reference layer content feature map
+
+        Output:
+            ref_corr: H * W, reference layer mapping,
+                      ref_corr[i, j] is the index of patch in style_fm (ref layer)
+                      which matches the i_th row and j_th col patch in img_fm (ref layer)
+        '''
+
+        return ref_corr
+
+
+    def upsample_corr(self, ref_corr, curr_h, curr_w):
+        '''
+        Input :
+            ref_corr: H * W, reference layer mapping,
+                      ref_corr[i, j] is the index of patch in style_fm (ref layer)
+                      which matches the i_th row and j_th col patch in img_fm (ref layer)
+            curr_h: the height of current layer
+            curr_w: the width of current layer
+
+        Output:
+            curr_corr: curr_h * curr_w, curr layer mapping,
+                       curr_corr[i, j] is the index of patch in style_fm (current layer)
+                       which matches the i_th row and j_th col patch in img_fm_curr (current layer)
+        '''
+
+        return curr_corr
+

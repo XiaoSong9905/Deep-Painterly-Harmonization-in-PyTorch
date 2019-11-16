@@ -211,6 +211,8 @@ def conv2d_same_padding(input, filter, stride=1):
 
 def get_patch(feature, pos_h, pos_w, patch_size=3):
     '''
+    return patch from feature at (pos_h, pos_w)
+
     :param feature: 1 * C * H * W
     :param pos_h:
     :param pos_w:

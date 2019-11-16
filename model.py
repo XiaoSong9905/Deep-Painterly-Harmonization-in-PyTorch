@@ -274,8 +274,10 @@ class StyleLossPass2(StyleLossPass1):
     child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
     '''
 
-    def __init__(self, style_weight, layer_mask, match_patch_size):
-        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size)
+    def __init__(self, style_weight, layer_mask, match_patch_size, stride):
+        super(StyleLossPass2, self).__init__()
+        self.stride = stride
+        self.patch_size = match_patch_size
         # TODO
 
     def forward(self):
@@ -297,7 +299,7 @@ class StyleLossPass2(StyleLossPass1):
 
         mapping = None # NearestNeighborIndex for ref_layer: H_ref * W_ref
         mapping_out = {}
-        stride = 1 #TODO
+        stride = 1 # TODO
         patch_size = 3 # TODO
 
         # Step 1: Find matches for the reference layer.
@@ -385,8 +387,76 @@ class StyleLossPass2(StyleLossPass1):
                       ref_corr[i, j] is the index of patch in style_fm (ref layer)
                       which matches the i_th row and j_th col patch in img_fm (ref layer)
         '''
-        pass
-        # return ref_corr
+
+        stride = 1  # TODO
+        patch_size = 3  # TODO
+
+        # Step 1: Find matches for the reference layer.
+        ref_h = style_fm.shape[2] # height of the reference layer
+        ref_w = style_fm.shape[3] # width of the reference layer
+        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1 # the number of patches along height
+        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1 # the number of patches along width
+
+        corr_tmp = np.zeros(ref_h, ref_w) # tmp variable, same as P in paper
+        ref_corr = np.zeros(ref_h, ref_w) # Output
+                                          # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
+
+        # for each patch
+        for i in range(n_patch_h):
+            for j in range(n_patch_w):
+                # a patch in content fm
+                patch = img_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
+
+                # Compute score map for each content fm patch
+                score_map = conv2d_same_padding(style_fm, patch, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
+                assert (score_map.shape == style_fm.shape)
+                score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
+                corr_tmp[i, j] = torch.argmax(score_map).item()
+
+        # Step 2: Enforce spatial consistency.
+        for i in range(n_patch_h):
+            for j in range(n_patch_w):
+                # Initialize a set of candidate style patches.
+                candidate_set = set()
+
+                # For all adjacent patches, look up the corresponding style patch.
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        # skip if out of bounds
+                        if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
+                            continue
+
+                        patch_idx = corr_tmp[i + di, j + dj] # index of neighbor patch in style feature map
+                        patch_pos = (patch_idx // n_patch_w - di, patch_idx % n_patch_w - dj)
+
+                        # skip if out of bounds
+                        if patch_pos[0] < 0 \
+                                or patch_pos[0] >= n_patch_h \
+                                or patch_pos[1] < 0 \
+                                or patch_pos[1] >= n_patch_w:
+                            continue
+
+                        candidate_set.add((patch_pos[0], patch_pos[1]))
+
+                # Select the candidate the most similar to the style patches
+                # associated to the neighbors of p.
+                min_sum = np.inf
+                for c_h, c_w in candidate_set:
+                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, patch_size) # get patch from style_fm at (c_h, c_w)
+                    sum = 0
+
+                    for di in [-1, 0, 1]:
+                        for dj in [-1, 0, 1]:
+                            patch_idx = corr_tmp[i + di, j + dj]
+                            patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
+                            # get patch from style_fm at (patch_pos[0], patch_pos[1])
+                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], patch_size)
+                            sum += F.conv2d(style_fm_ref_c, style_fm_ref_p).item()
+
+                    if sum < min_sum:
+                        min_sum = sum
+                        ref_corr[i, j] = c_h * n_patch_w + c_w
+        return ref_corr
 
 
     def upsample_corr(self, ref_corr, curr_h, curr_w):
@@ -404,5 +474,25 @@ class StyleLossPass2(StyleLossPass1):
                        which matches the i_th row and j_th col patch in img_fm_curr (current layer)
         '''
 
-        return curr_corr
+        # curr_corr = F.interpolate(torch.from_numpy(ref_corr), size=(curr_h, curr_w))
+        # return curr_corr
+        curr_corr = np.zeros((curr_h, curr_w))
+        ref_h, ref_w = ref_corr.shape
 
+        h_ratio = curr_h / ref_h
+        w_ratio = curr_w / ref_w
+
+        for i in range(curr_h):
+            for j in range(curr_w):
+                ref_idx = [(i + 0.5) // h_ratio, (j + 0.5) // w_ratio]
+                ref_idx[0] = int(max(min(ref_idx[0], ref_w - 1), 0))
+                ref_idx[1] = int(max(min(ref_idx[1], ref_h - 1), 0))
+
+                ref_mapping_idx = ref_corr[ref_idx[0], ref_idx[1]]
+                ref_mapping_idx = (ref_mapping_idx // ref_w, ref_mapping_idx % ref_w)
+
+                curr_mapping_idx = (int(i + (ref_mapping_idx[0] - ref_idx[0]) * h_ratio + 0.5),
+                                    int(j + (ref_mapping_idx[1] - ref_idx[1]) * w_ratio + 0.5))
+                curr_corr[i, j] = curr_mapping_idx[0] * curr_w + curr_mapping_idx[1]
+
+        return curr_corr

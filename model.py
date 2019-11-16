@@ -385,8 +385,8 @@ class StyleLossPass2(StyleLossPass1):
                       ref_corr[i, j] is the index of patch in style_fm (ref layer)
                       which matches the i_th row and j_th col patch in img_fm (ref layer)
         '''
-
-        return ref_corr
+        pass
+        # return ref_corr
 
 
     def upsample_corr(self, ref_corr, curr_h, curr_w):

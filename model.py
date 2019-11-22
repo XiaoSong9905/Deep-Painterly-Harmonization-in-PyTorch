@@ -275,14 +275,15 @@ class StyleLossPass2(StyleLossPass1):
     '''
 
     def __init__(self, style_weight, layer_mask, match_patch_size, stride):
-        super(StyleLossPass2, self).__init__()
+        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size)
         self.stride = stride
         self.patch_size = match_patch_size
         # TODO
 
-    def forward(self):
+    def forward(self, input):
         return None
 
+    # To be delete when finished
     def consistent_mapping(self, style_fm_dict, img_fm_dict, layers, ref_layer='relu4_1'):
         # TODO conv4_1 or relu4_1?
         # after conv, normalize, loc: cuda_utils line 1260
@@ -394,8 +395,8 @@ class StyleLossPass2(StyleLossPass1):
         # Step 1: Find matches for the reference layer.
         ref_h = style_fm.shape[2] # height of the reference layer
         ref_w = style_fm.shape[3] # width of the reference layer
-        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1 # the number of patches along height
-        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1 # the number of patches along width
+        n_patch_h = math.floor((ref_h - self.patch_size) / self.stride) + 1 # the number of patches along height
+        n_patch_w = math.floor((ref_w - self.patch_size) / self.stride) + 1 # the number of patches along width
 
         corr_tmp = np.zeros(ref_h, ref_w) # tmp variable, same as P in paper
         ref_corr = np.zeros(ref_h, ref_w) # Output
@@ -405,10 +406,11 @@ class StyleLossPass2(StyleLossPass1):
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # a patch in content fm
-                patch = img_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
+                patch = img_fm[:, :, i * self.patch_size:(i + 1) * self.patch_size,
+                        j * self.patch_size:(j + 1) * self.patch_size]
 
                 # Compute score map for each content fm patch
-                score_map = conv2d_same_padding(style_fm, patch, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
+                score_map = conv2d_same_padding(style_fm, patch, stride=self.stride)  # 1 * 1 * n_patch_h * n_patch_w
                 assert (score_map.shape == style_fm.shape)
                 score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
                 corr_tmp[i, j] = torch.argmax(score_map).item()
@@ -442,7 +444,7 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, patch_size) # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, self.patch_size) # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:
@@ -450,7 +452,7 @@ class StyleLossPass2(StyleLossPass1):
                             patch_idx = corr_tmp[i + di, j + dj]
                             patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
                             # get patch from style_fm at (patch_pos[0], patch_pos[1])
-                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], patch_size)
+                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], self.patch_size)
                             sum += F.conv2d(style_fm_ref_c, style_fm_ref_p).item()
 
                     if sum < min_sum:

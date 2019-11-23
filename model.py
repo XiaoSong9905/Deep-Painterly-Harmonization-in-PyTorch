@@ -306,9 +306,10 @@ class StyleLossPass2(StyleLossPass1):
         # for other layers
         elif self.mode == 'capture_style_others':
             style_fm = input.detach()
+            _, _, curr_H, curr_W = input.shape
             # TODO: curr_h, curr_w, formatting
-            # self.curr_corr = self.upsample_corr(self.style_fm_matched, )
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
+            self.curr_corr = self.upsample_corr(self.style_fm_matched, curr_H, curr_W)
+            style_fm_matched_masked = torch.mul(self.curr_corr, self.mask)
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
 

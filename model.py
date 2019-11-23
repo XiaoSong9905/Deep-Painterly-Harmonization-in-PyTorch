@@ -165,7 +165,7 @@ class GramMatrix(nn.Module):
 
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, style_weight, layer_mask, match_patch_size):
+    def __init__(self, style_weight, layer_mask, match_patch_size, stride=3):
         super(StyleLossPass1, self).__init__()
         self.weight = style_weight
         self.critertain = nn.MSELoss()
@@ -173,7 +173,8 @@ class StyleLossPass1(nn.Module):
         self.mask = layer_mask.clone()
         self.mode = 'None'
         self.loss = None
-        self.match_patch_size = match_patch_size
+        self.patch_size = match_patch_size
+        self.stride = stride
 
     def forward(self, input):
         '''
@@ -240,8 +241,8 @@ class StyleLossPass1(nn.Module):
         n_patch_h = math.floor(style_fm_matched.shape[2] / 3)  # use math package to avoid potential python2 issue
         n_patch_w = math.floor(style_fm_matched.shape[3] / 3)
 
-        stride = 3
-        patch_size = self.match_patch_size
+        stride = self.stride
+        patch_size = self.patch_size
 
         for i in range(n_patch_h):
             for j in range(n_patch_w):
@@ -274,16 +275,8 @@ class StyleLossPass2(StyleLossPass1):
     child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
     '''
 
-    def __init__(self, style_weight, layer_mask, match_patch_size, stride):
-        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size)
-        self.stride = stride
-        self.patch_size = match_patch_size
-        self.weight = style_weight
-        self.critertain = nn.MSELoss()
-        self.gram = GramMatrix()
-        self.mask = layer_mask.clone()
-        self.mode = 'None'
-        self.loss = None
+    def __init__(self, style_weight, layer_mask, match_patch_size, stride=1):
+        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size, stride)
         # TODO
 
     def forward(self, input):
@@ -295,7 +288,6 @@ class StyleLossPass2(StyleLossPass1):
             # Compute Match
             self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
             print('StyleLossPass2 compute match relation')
-
             # Compute Gram Matrix
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
@@ -436,14 +428,14 @@ class StyleLossPass2(StyleLossPass1):
                       which matches the i_th row and j_th col patch in img_fm (ref layer)
         '''
 
-        stride = 1  # TODO
-        patch_size = 3  # TODO
+        stride = self.stride
+        patch_size = self.patch_size
 
         # Step 1: Find matches for the reference layer.
         ref_h = style_fm.shape[2]  # height of the reference layer
         ref_w = style_fm.shape[3]  # width of the reference layer
-        n_patch_h = math.floor((ref_h - self.patch_size) / self.stride) + 1  # the number of patches along height
-        n_patch_w = math.floor((ref_w - self.patch_size) / self.stride) + 1  # the number of patches along width
+        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1  # the number of patches along height
+        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1  # the number of patches along width
 
         corr_tmp = np.zeros(ref_h, ref_w)  # tmp variable, same as P in paper
         ref_corr = np.zeros(ref_h, ref_w)  # Output
@@ -453,11 +445,11 @@ class StyleLossPass2(StyleLossPass1):
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # a patch in content fm
-                patch = img_fm[:, :, i * self.patch_size:(i + 1) * self.patch_size,
-                        j * self.patch_size:(j + 1) * self.patch_size]
+                patch = img_fm[:, :, i * patch_size:(i + 1) * patch_size,
+                        j * patch_size:(j + 1) * patch_size]
 
                 # Compute score map for each content fm patch
-                score_map = conv2d_same_padding(style_fm, patch, stride=self.stride)  # 1 * 1 * n_patch_h * n_patch_w
+                score_map = conv2d_same_padding(style_fm, patch, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
                 assert (score_map.shape == style_fm.shape)
                 score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
                 corr_tmp[i, j] = torch.argmax(score_map).item()
@@ -491,8 +483,7 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm, c_h, c_w,
-                                               self.patch_size)  # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(style_fm, c_h, c_w,patch_size)  # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:
@@ -500,7 +491,7 @@ class StyleLossPass2(StyleLossPass1):
                             patch_idx = corr_tmp[i + di, j + dj]
                             patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
                             # get patch from style_fm at (patch_pos[0], patch_pos[1])
-                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], self.patch_size)
+                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], patch_size)
                             sum += F.conv2d(style_fm_ref_c, style_fm_ref_p).item()
 
                     if sum < min_sum:

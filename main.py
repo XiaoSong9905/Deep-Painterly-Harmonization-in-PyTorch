@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument("-dilated_mask", help="./path/file to dilated(loss) mask", default='data/0_c_mask_dilated.jpg')
     parser.add_argument("-p1_output_img", help="./path/file for output image", default='output/0_pass1_out.jpg')
     parser.add_argument("-p2_output_img", help="./path/file for output image", default='output/0_pass2_out.jpg')
-    parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int, 
+    parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int,
                         default=64)
 
     # Training Parameter
@@ -52,7 +52,8 @@ def get_args():
     parser.add_argument("-p2_content_layers", help="single layer for content", default='relu4_2')
     parser.add_argument("-p2_style_layers", help="single layer for style", default='relu4_2')
     parser.add_argument("-content_weight", type=float, default=5)
-    parser.add_argument("-style_weight", type=float, default=100)  # can setup content loss, style loss seprately for pass1 pass2
+    parser.add_argument("-style_weight", type=float,
+                        default=100)  # can setup content loss, style loss seprately for pass1 pass2
     parser.add_argument("-tv_weight", type=float, default=1e-3)
     parser.add_argument("-init", choices=['random', 'image'], default='image')
     parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default=None)
@@ -74,13 +75,13 @@ def preprocess(cfg):
     dtype, device = setup(cfg)
 
     # Get input image and preprocess
-    native_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device, cfg, # 1 * 3 * H * W 
+    native_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device, cfg,  # 1 * 3 * H * W
                                 name='read_naive_img.png').type(dtype)
-    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg, # 1 * 3 * H * W  
+    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg,  # 1 * 3 * H * W
                                name='read_style_img.png').type(dtype)
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg, # 1 * 1 * H * W  
+    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,  # 1 * 1 * H * W
                                  name='read_tight_mask.png').type(dtype)
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg, # 1 * 1 * H * W  
+    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,  # 1 * 1 * H * W
                                 name='read_loss_mask.png').type(dtype)
 
     # Display Masked region to visualy understand which region will be transfered 
@@ -93,7 +94,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_los
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
             print('Iteration {:08d} ; Content Loss {:.06f}; Style Loss {:.06f}; Total Loss {:.06f}'.format(
-                i_iter, c_loss.item(), s_loss.item(), total_loss.item() ))
+                i_iter, c_loss.item(), s_loss.item(), total_loss.item()))
 
     def periodic_save(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters)
@@ -104,7 +105,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_los
                 filename = output_filename + str(file_extension)
             else:
                 filename = str(output_filename) + "_iter_{:08d}".format(i_iter) + str(file_extension)
-            
+
             img_deprocessed = img_deprocess(native_img)
             img_deprocessed.save(str(filename))
 
@@ -213,13 +214,13 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
 
     print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
     start_time = time.time()
-    
+
     for i in content_loss_list:
         i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'capture_style'
     net(style_img)
-    
+
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
@@ -231,13 +232,13 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
         i.mode = 'loss'
 
     # freeze new added loss layer
-    for param in net.parameters(): 
+    for param in net.parameters():
         param.requires_grad = False
 
     # Set image to be gradient updatable 
     native_img = nn.Parameter(native_img)
     native_img = native_img.to(device)
-    
+
     assert (native_img.requires_grad == True)
 
     print('\n===> Start Updating Image')
@@ -251,10 +252,112 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     return native_img
 
 
-def pass2():
+def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
     # Set up device and datatye 
     # TODO
-    return None
+    # Setup Network
+    content_layers = cfg.p2_content_layers.split(',')
+    style_layers = cfg.p2_style_layers.split(',')
+    content_loss_list = []
+    style_loss_list = []
+    tv_loss_list = []
+
+    # Build backbone
+    cnn, layer_list = build_backbone(cfg)
+    cnn = copy.deepcopy(cnn)
+
+    # Build net with loss model
+    net = nn.Sequential()
+    mask = loss_mask
+
+    print('\n===> Build Network with Backbone & Loss Module')
+
+    if cfg.tv_weight > 0:
+        print('Add TVLoss at Position {}'.format(str(len(net))))
+        tv_loss = TVLoss(cfg.tv_weight)
+        net.add_module(str(len(net)), tv_loss)
+        tv_loss_list.append(tv_loss)
+
+    for i, layer in enumerate(list(cnn)):
+        if isinstance(layer, nn.Conv2d):
+            net.add_module(str(len(net)), layer)
+            sap = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+            mask = sap(mask)
+            # sap get a weighted mask, to see how this work, checkout the `understand mask` notebook
+        elif isinstance(layer, nn.ReLU):
+            net.add_module(str(len(net)), layer)
+        elif isinstance(layer, nn.MaxPool2d) or isinstance(layer, nn.AvgPool2d):
+            net.add_module(str(len(net)), layer)
+            mask = F.interpolate(mask, scale_factor=(
+                0.5, 0.5))  # resize 0.5 may not work, the network don't garentee a fix output
+
+        # Add Loss layer
+        if layer_list[i] in content_layers:
+            print('Add Content Loss at Position {}'.format(str(len(net))))
+            content_layer_loss = ContentLoss(cfg.content_weight, mask)
+            net.add_module(str(len(net)), content_layer_loss)
+            content_loss_list.append(content_layer_loss)
+
+        if layer_list[i] in style_layers:
+            print('Add Style Loss at Position {}'.format(str(len(net))))
+            # TODO style loss need more operation
+            # Match operation should be done at this stage, future forward backward only do the update
+            # See neural_gram.lua line 120 - 136
+            style_layer_loss = StyleLossPass2(cfg.style_weight, mask, cfg.match_patch_size)
+            net.add_module(str(len(net)), style_layer_loss)
+            style_loss_list.append(style_layer_loss)
+
+    del cnn  # delet unused net to save memory
+
+    net = net.to(device).eval()
+
+    print(net)
+
+    print('\n===> Start Capture Content Image Feature Map')
+    for i in content_loss_list:
+        i.mode = 'capture'
+    for i in style_loss_list:
+        i.mode = 'capture_content'
+    net(native_img)
+
+    print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
+    start_time = time.time()
+
+    for i in content_loss_list:
+        i.mode = 'None'
+    for i in style_loss_list:
+        i.mode = 'capture_style'
+    net(style_img)
+
+    time_elapsed = time.time() - start_time
+    print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+
+    # reset the model to loss mode for update
+    for i in content_loss_list:
+        i.mode = 'loss'
+
+    for i in style_loss_list:
+        i.mode = 'loss'
+
+    # freeze new added loss layer
+    for param in net.parameters():
+        param.requires_grad = False
+
+    # Set image to be gradient updatable
+    native_img = nn.Parameter(native_img)
+    native_img = native_img.to(device)
+
+    assert (native_img.requires_grad == True)
+
+    print('\n===> Start Updating Image')
+    start_time = time.time()
+
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net)
+
+    time_elapsed = time.time() - start_time
+    print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+
+    return native_img
 
 
 def main():
@@ -262,7 +365,7 @@ def main():
     orig_stdout = init_log()
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
     pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
-    # pass2
+    pass2(cfg, device, native_img, style_img, tight_mask, loss_mask)
     end_log(orig_stdout)
 
 

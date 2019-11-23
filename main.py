@@ -325,7 +325,7 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
 
     for i in content_loss_list:
         i.mode = 'None'
-    for i in style_loss_list:
+    for i in style_loss_list: # TODO: change ref layer, and other layers
         i.mode = 'capture_style'
     net(style_img)
 

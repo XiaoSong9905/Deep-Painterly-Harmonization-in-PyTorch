@@ -286,26 +286,22 @@ class StyleLossPass2(StyleLossPass1):
             print('StyleLossPass2 style feature map ref layer with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match
-            self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
+            self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
             print('StyleLossPass2 compute match relation')
             # Compute Gram Matrix
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
 
-            del self.content_fm
-
         # for other layers
         elif self.mode == 'capture_style_others':
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
-            # TODO: curr_h, curr_w, formatting
-            self.curr_corr = self.upsample_corr(self.style_fm_matched, curr_H, curr_W)
-            style_fm_matched_masked = torch.mul(self.curr_corr, self.mask)
+            self.curr_corr, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
 
-            del self.content_fm
 
         # Step 1 : Capture Content Feature Map
         elif self.mode == 'capture_content':
@@ -484,7 +480,7 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm, c_h, c_w,patch_size)  # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, patch_size)  # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:

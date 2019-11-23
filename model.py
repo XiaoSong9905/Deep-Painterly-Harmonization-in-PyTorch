@@ -61,8 +61,8 @@ def build_backbone(cfg):
 
     # Freeze Parameter, only update img not net parameter 
     # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
-    net = net.eval() 
-    for param in net.parameters(): 
+    net = net.eval()
+    for param in net.parameters():
         param.requires_grad = False
 
     print('\n===> Build Backbone Network with {}'.format(cfg.model))
@@ -119,7 +119,7 @@ class ContentLoss(nn.Module):
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.content_fm) # 1 * 1 * H * W -> 1 * C * H * W 
+            self.mask = self.mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
 
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
@@ -168,7 +168,7 @@ class StyleLossPass1(nn.Module):
     def __init__(self, style_weight, layer_mask, match_patch_size):
         super(StyleLossPass1, self).__init__()
         self.weight = style_weight
-        self.critertain = nn.MSELoss() 
+        self.critertain = nn.MSELoss()
         self.gram = GramMatrix()
         self.mask = layer_mask.clone()
         self.mode = 'None'
@@ -186,7 +186,7 @@ class StyleLossPass1(nn.Module):
                & return input
         '''
         # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
-        if self.mode == 'capture_style': #
+        if self.mode == 'capture_style':  #
             style_fm = input.detach()
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
@@ -196,12 +196,12 @@ class StyleLossPass1(nn.Module):
 
             # Compute Gram Matrix 
             style_fm_matched_masked = torch.mul(style_fm_matched, self.mask)
-            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask) 
+            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass1 compute style gram matrix')
 
             del self.content_fm
             del style_fm
-        
+
         # Step 1 : Capture Content Feature Map  
         elif self.mode == 'capture_content':
             self.content_fm = input.detach()
@@ -236,7 +236,7 @@ class StyleLossPass1(nn.Module):
                 Step2 : masked the matched feature map
 
         '''
-        style_fm_matched = style_fm.clone() 
+        style_fm_matched = style_fm.clone()
         n_patch_h = math.floor(style_fm_matched.shape[2] / 3)  # use math package to avoid potential python2 issue
         n_patch_w = math.floor(style_fm_matched.shape[3] / 3)
 
@@ -249,7 +249,7 @@ class StyleLossPass1(nn.Module):
                 kernal = content_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
 
                 # Compute score map for each content fm patch kernal 
-                score_map = F.conv2d(style_fm, kernal, stride=stride)  
+                score_map = F.conv2d(style_fm, kernal, stride=stride)
                 score_map = score_map[0, 0, :, :]  # 1 * 1 * n_patch_h * n_patch_w ->  1 * 1 * n_patch_h * n_patch_w
 
                 # Find Maximal idx output score map 
@@ -257,14 +257,14 @@ class StyleLossPass1(nn.Module):
                 matched_style_idx = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
 
                 # Find matched patch in style fm 
-                matched_style_patch = style_fm[:, :, 
+                matched_style_patch = style_fm[:, :,
                                       matched_style_idx[0] * patch_size: (matched_style_idx[0] + 1) * patch_size, \
-                                      matched_style_idx[1] * patch_size: (matched_style_idx[1] + 1) * patch_size]  
-                                      #  1 * C * 3 * 3
+                                      matched_style_idx[1] * patch_size: (matched_style_idx[1] + 1) * patch_size]
+                #  1 * C * 3 * 3
 
-                style_fm_matched[:, :, 
-                            i * patch_size:(i + 1) * patch_size,
-                            j * patch_size:(j + 1) * patch_size] = matched_style_patch
+                style_fm_matched[:, :,
+                i * patch_size:(i + 1) * patch_size,
+                j * patch_size:(j + 1) * patch_size] = matched_style_patch
 
         return style_fm_matched
 
@@ -278,10 +278,57 @@ class StyleLossPass2(StyleLossPass1):
         super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size)
         self.stride = stride
         self.patch_size = match_patch_size
+        self.weight = style_weight
+        self.critertain = nn.MSELoss()
+        self.gram = GramMatrix()
+        self.mask = layer_mask.clone()
+        self.mode = 'None'
+        self.loss = None
         # TODO
 
     def forward(self, input):
-        return None
+        # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram
+        if self.mode == 'capture_style_ref':
+            style_fm = input.detach()
+            print('StyleLossPass2 style feature map ref layer with shape {} captured'.format(str(style_fm.shape)))
+
+            # Compute Match
+            self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
+            print('StyleLossPass2 compute match relation')
+
+            # Compute Gram Matrix
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
+            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
+            print('StyleLossPass2 compute style gram matrix')
+
+            del self.content_fm
+
+        # for other layers
+        elif self.mode == 'capture_style_others':
+            style_fm = input.detach()
+            # TODO: curr_h, curr_w, formatting
+            # self.curr_corr = self.upsample_corr(self.style_fm_matched, )
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
+            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
+            print('StyleLossPass2 compute style gram matrix')
+
+            del self.content_fm
+
+        # Step 1 : Capture Content Feature Map
+        elif self.mode == 'capture_content':
+            self.content_fm = input.detach()
+            print('StyleLossPass2 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+
+            # Update Mask Size after feature map is captured
+            self.mask = self.mask.expand_as(self.content_fm)
+
+        # Step 4 : during updateing image
+        elif self.mode == 'loss':
+            self.img_gram = self.gram(torch.mul(input, self.mask))
+            self.img_gram = self.img_gram / torch.sum(self.mask)
+            self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
+
+        return input
 
     # To be delete when finished
     def consistent_mapping(self, style_fm_dict, img_fm_dict, layers, ref_layer='relu4_1'):
@@ -298,10 +345,10 @@ class StyleLossPass2(StyleLossPass1):
             style_fm_masked_dict: dict, style_fm_masked_dict[layer_i] = 1 * C_i * H_i * W_i
         '''
 
-        mapping = None # NearestNeighborIndex for ref_layer: H_ref * W_ref
+        mapping = None  # NearestNeighborIndex for ref_layer: H_ref * W_ref
         mapping_out = {}
-        stride = 1 # TODO
-        patch_size = 3 # TODO
+        stride = 1  # TODO
+        patch_size = 3  # TODO
 
         # Step 1: Find matches for the reference layer.
         style_fm_ref = style_fm_dict[ref_layer]
@@ -376,7 +423,6 @@ class StyleLossPass2(StyleLossPass1):
 
         return mapping_out
 
-
     def match_fm_ref(self, style_fm, img_fm):
         '''
         Input :
@@ -393,14 +439,14 @@ class StyleLossPass2(StyleLossPass1):
         patch_size = 3  # TODO
 
         # Step 1: Find matches for the reference layer.
-        ref_h = style_fm.shape[2] # height of the reference layer
-        ref_w = style_fm.shape[3] # width of the reference layer
-        n_patch_h = math.floor((ref_h - self.patch_size) / self.stride) + 1 # the number of patches along height
-        n_patch_w = math.floor((ref_w - self.patch_size) / self.stride) + 1 # the number of patches along width
+        ref_h = style_fm.shape[2]  # height of the reference layer
+        ref_w = style_fm.shape[3]  # width of the reference layer
+        n_patch_h = math.floor((ref_h - self.patch_size) / self.stride) + 1  # the number of patches along height
+        n_patch_w = math.floor((ref_w - self.patch_size) / self.stride) + 1  # the number of patches along width
 
-        corr_tmp = np.zeros(ref_h, ref_w) # tmp variable, same as P in paper
-        ref_corr = np.zeros(ref_h, ref_w) # Output
-                                          # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
+        corr_tmp = np.zeros(ref_h, ref_w)  # tmp variable, same as P in paper
+        ref_corr = np.zeros(ref_h, ref_w)  # Output
+        # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
 
         # for each patch
         for i in range(n_patch_h):
@@ -428,7 +474,7 @@ class StyleLossPass2(StyleLossPass1):
                         if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                             continue
 
-                        patch_idx = corr_tmp[i + di, j + dj] # index of neighbor patch in style feature map
+                        patch_idx = corr_tmp[i + di, j + dj]  # index of neighbor patch in style feature map
                         patch_pos = (patch_idx // n_patch_w - di, patch_idx % n_patch_w - dj)
 
                         # skip if out of bounds
@@ -444,7 +490,8 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, self.patch_size) # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(style_fm, c_h, c_w,
+                                               self.patch_size)  # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:
@@ -459,7 +506,6 @@ class StyleLossPass2(StyleLossPass1):
                         min_sum = sum
                         ref_corr[i, j] = c_h * n_patch_w + c_w
         return ref_corr
-
 
     def upsample_corr(self, ref_corr, curr_h, curr_w):
         '''

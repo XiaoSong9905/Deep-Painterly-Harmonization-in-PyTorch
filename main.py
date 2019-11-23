@@ -333,7 +333,7 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
         else:
             i.mode = 'capture_style_others'
     net(style_img)
-    net(style_img)
+    net(style_img) # TODO: need purify since ref layer calculate twice
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))

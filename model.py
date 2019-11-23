@@ -323,7 +323,7 @@ class StyleLossPass2(StyleLossPass1):
 
         return input
 
-    # To be delete when finished
+    # TODO To be delete when finished
     def consistent_mapping(self, style_fm_dict, img_fm_dict, layers, ref_layer='relu4_1'):
         # TODO conv4_1 or relu4_1?
         # after conv, normalize, loc: cuda_utils line 1260
@@ -426,6 +426,7 @@ class StyleLossPass2(StyleLossPass1):
             ref_corr: H * W, reference layer mapping,
                       ref_corr[i, j] is the index of patch in style_fm (ref layer)
                       which matches the i_th row and j_th col patch in img_fm (ref layer)
+            style_fm_masked : 1 * C * H * W
         '''
 
         stride = self.stride
@@ -497,9 +498,19 @@ class StyleLossPass2(StyleLossPass1):
                     if sum < min_sum:
                         min_sum = sum
                         ref_corr[i, j] = c_h * n_patch_w + c_w
-        return ref_corr
 
-    def upsample_corr(self, ref_corr, curr_h, curr_w):
+        # Step 3: Create style_fm_matched based on ref_corr
+        style_fm_matched = style_fm.clone()
+        for i in range(n_patch_h):
+            for j in range(n_patch_w):
+                # Find matched index in style fm
+                matched_style_idx = (ref_corr[i, j] // ref_w, ref_corr % ref_w)
+                #  1 * C * 3 * 3
+                style_fm_matched[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]]
+
+        return ref_corr, style_fm_matched
+
+    def upsample_corr(self, ref_corr, curr_h, curr_w, style_fm):
         '''
         Input :
             ref_corr: H * W, reference layer mapping,
@@ -507,11 +518,13 @@ class StyleLossPass2(StyleLossPass1):
                       which matches the i_th row and j_th col patch in img_fm (ref layer)
             curr_h: the height of current layer
             curr_w: the width of current layer
+            style_fm : 1 * C * H * W
 
         Output:
             curr_corr: curr_h * curr_w, curr layer mapping,
                        curr_corr[i, j] is the index of patch in style_fm (current layer)
                        which matches the i_th row and j_th col patch in img_fm_curr (current layer)
+            style_fm_masked : 1 * C * H * W
         '''
 
         # curr_corr = F.interpolate(torch.from_numpy(ref_corr), size=(curr_h, curr_w))
@@ -521,6 +534,8 @@ class StyleLossPass2(StyleLossPass1):
 
         h_ratio = curr_h / ref_h
         w_ratio = curr_w / ref_w
+
+        style_fm_matched = style_fm.clone()
 
         for i in range(curr_h):
             for j in range(curr_w):
@@ -535,4 +550,7 @@ class StyleLossPass2(StyleLossPass1):
                                     int(j + (ref_mapping_idx[1] - ref_idx[1]) * w_ratio + 0.5))
                 curr_corr[i, j] = curr_mapping_idx[0] * curr_w + curr_mapping_idx[1]
 
-        return curr_corr
+                #  1 * C * 3 * 3
+                style_fm_matched[:, :, i, j] = style_fm[:, :, curr_mapping_idx[0], curr_mapping_idx[1]]
+
+        return curr_corr, style_fm_matched

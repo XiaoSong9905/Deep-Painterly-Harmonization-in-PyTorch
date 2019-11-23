@@ -277,6 +277,7 @@ class StyleLossPass2(StyleLossPass1):
 
     def __init__(self, style_weight, layer_mask, match_patch_size, stride=1):
         super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size, stride)
+        self.ref_corr = None
         # TODO
 
     def forward(self, input):
@@ -295,6 +296,9 @@ class StyleLossPass2(StyleLossPass1):
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
+            if self.ref_corr is None:
+                print('No ref_corr infor, do nothing.')
+                return input
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
             self.curr_corr, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)

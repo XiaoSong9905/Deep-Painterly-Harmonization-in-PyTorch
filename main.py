@@ -278,7 +278,7 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
         net.add_module(str(len(net)), tv_loss)
         tv_loss_list.append(tv_loss)
 
-    for i, layer in reversed(list(enumerate(list(cnn)))):
+    for i, layer in enumerate(list(cnn)):
         print('current layer is: ', layer, ' with its idx: ', i)
         if isinstance(layer, nn.Conv2d):
             net.add_module(str(len(net)), layer)
@@ -326,11 +326,13 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
 
     for i in content_loss_list:
         i.mode = 'None'
-    for idx, i in enumerate(style_loss_list): # TODO: change ref layer, and other layers
-        if idx == 0:
+    print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
+    for idx, i in enumerate(style_loss_list):  # TODO: change ref layer, and other layers
+        if idx == len(style_loss_list) - 1:  # last layer
             i.mode = 'capture_style_ref'
         else:
             i.mode = 'capture_style_others'
+    net(style_img)
     net(style_img)
 
     time_elapsed = time.time() - start_time

@@ -20,7 +20,7 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 ## TODO 
 
-1. (dd, zw) StyleLossPass2 
+1. (dd, zw) StyleLossPass2 [DONE]
 
 2. (sx) StyleLossPass1 [DONE]
 

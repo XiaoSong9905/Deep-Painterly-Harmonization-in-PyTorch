@@ -153,7 +153,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_los
         optimizer.step(closure)
         i_iter += 1
 
-    return native_img # 1 * 3 * H * W 
+    return native_img  # 1 * 3 * H * W
 
 
 def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
@@ -254,15 +254,16 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     print('\n===> Start Updating Image')
     start_time = time.time()
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass='pass1')
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net,
+                       which_pass='pass1')
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return native_img # 1 * 3 * H * W 
+    return native_img  # 1 * 3 * H * W
 
 
-def pass2(cfg, device, orgin_img, native_img, style_img, tight_mask, loss_mask):
+def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
     # Set up device and datatye 
     # TODO
     # Setup Network
@@ -328,23 +329,16 @@ def pass2(cfg, device, orgin_img, native_img, style_img, tight_mask, loss_mask):
     print(len(content_loss_list), len(style_loss_list))
     for i in content_loss_list:
         i.mode = 'capture'
-    net(native_img)
-    
-    for i in content_loss_list:
-        i.mode = 'None'
-
     for i in style_loss_list:
         i.mode = 'capture_content'
-    net(orgin_img)
-
+    net(native_img)
+    for i in content_loss_list:
+        i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'None'
-
     print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
     start_time = time.time()
 
-    for i in content_loss_list:
-        i.mode = 'None'
     print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
     for idx, i in enumerate(style_loss_list):  # TODO: change ref layer, and other layers
         if idx == len(style_loss_list) - 1:  # last layer
@@ -359,7 +353,7 @@ def pass2(cfg, device, orgin_img, native_img, style_img, tight_mask, loss_mask):
         else:
             tmp_ref_corr = i.get_ref_infor()
             i.mode = 'None'
-    net(style_img) # TODO: need purify since ref layer calculate twice
+    net(style_img)  # TODO: need purify since ref layer calculate twice
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -384,12 +378,13 @@ def pass2(cfg, device, orgin_img, native_img, style_img, tight_mask, loss_mask):
     print('\n===> Start Updating Image')
     start_time = time.time()
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass='pass2')
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net,
+                       which_pass='pass2')
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return native_img # 1 * 3 * H * W 
+    return native_img  # 1 * 3 * H * W
 
 
 def main():
@@ -398,8 +393,8 @@ def main():
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
     # native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
     dtype, device = setup(cfg)
-    native_img_inter = img_preprocess('./tmp_pass1_res.jpg', cfg.output_img_size, dtype, device,cfg).type(dtype)
-    native_img_final = pass2(cfg, device, native_img, native_img_inter, style_img, tight_mask, loss_mask)
+    native_img_inter = img_preprocess('./tmp_pass1_res.jpg', cfg.output_img_size, dtype, device, cfg).type(dtype)
+    native_img_final = pass2(cfg, device, native_img_inter, style_img, tight_mask, loss_mask)
     # end_log(orig_stdout)
 
 

@@ -65,9 +65,6 @@ def build_backbone(cfg):
     for param in net.parameters():
         param.requires_grad = False
 
-    print('\n===> Build Backbone Network with {}'.format(cfg.model))
-    print(net)
-
     assert (net.training == False)
     assert (len(net) == len(layer_list))
 
@@ -100,11 +97,11 @@ class TVLoss(nn.Module):
 
 
 class ContentLoss(nn.Module):
-    def __init__(self, content_weight, layer_mask):
+    def __init__(self, content_weight, mask):
         super(ContentLoss, self).__init__()
         self.weight = content_weight  # content loss weight
         self.criterian = nn.MSELoss()
-        self.mask = layer_mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
+        self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
 
     def forward(self, input):
@@ -165,12 +162,12 @@ class GramMatrix(nn.Module):
 
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, style_weight, layer_mask, match_patch_size, stride=3):
+    def __init__(self, style_weight, mask, match_patch_size, stride=3):
         super().__init__()
         self.weight = style_weight
         self.critertain = nn.MSELoss()
         self.gram = GramMatrix()
-        self.mask = layer_mask.clone()
+        self.mask = mask.clone()
         self.mode = 'None'
         self.loss = None
         self.patch_size = match_patch_size
@@ -219,7 +216,7 @@ class StyleLossPass1(nn.Module):
 
         return input
 
-    def match_fm(self, style_fm, content_fm):
+    def match_fm(self, content_fm, style_fm):
         '''
         Input : 
             style_fm : 1 * C * H * W 
@@ -237,9 +234,31 @@ class StyleLossPass1(nn.Module):
                 Step2 : masked the matched feature map
 
         '''
+        # Padding Style FM & Content FM 
+        stride = self.stride
+        patch_size = self.patch_size 
+        padding = (patch_size - 1) // 2 
+        c1, h1, w1 = content_fm[1], content_fm[2], content_fm[3]
+        c2, h2, w2 = style_fm[1], style_fm[2], style_fm[3]
+        c, h, w = c1, h1, w1 
+
+        # It's not nessary for two feature map to share the same spatial dimention
+        # but in this project we enforce that for better quantititive result 
+        assert(c1 == c2)
+        assert(h1 == h2) 
+        assert(w1 == w2)
+
+        n_patch_h = math.floor(h / stride)  # use math package to avoid potential python2 issue
+        n_patch_w = math.floor(w / stride)
+
+        content_fm_orig = content_fm.clone()
+        style_fm_orig = style_fm.clone()
+
+        content_fm = F.pad()
+
+
         style_fm_matched = style_fm.clone()
-        n_patch_h = math.floor(style_fm_matched.shape[2] / 3)  # use math package to avoid potential python2 issue
-        n_patch_w = math.floor(style_fm_matched.shape[3] / 3)
+
 
         stride = self.stride
         patch_size = self.patch_size
@@ -350,8 +369,8 @@ class StyleLossPass2(StyleLossPass1):
         ref_w = style_fm.shape[3]  # width of the reference layer
         n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
         n_patch_w = math.floor(ref_w / stride)  # the number of patches along width
-        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding])
-        padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding])
+        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding], mode='reflect', )
+        padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding], mode='reflect')
 
         corr_tmp = np.zeros((ref_h, ref_w))  # tmp variable, same as P in paper
         ref_corr = np.zeros((ref_h, ref_w))  # Output

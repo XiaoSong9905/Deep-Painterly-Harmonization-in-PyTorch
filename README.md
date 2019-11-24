@@ -48,11 +48,13 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 14. 存下来pass1现在有的问题，然后在progress report上说找到了问题
 
-15. pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  
+15. pass2 rrelu5_1 是否有被用到， 把5_1的styel module删除掉
 
-16. 需要更改 pass2 的match的部分 (upsampler_corr)
+16. pass1 参考源代码，更改match，解决产生noise的问题 (pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  )
 
-17. pass2 match 流程
+17. pass2 参考源代码，解决模糊的问题， 可能和match相关
+
+18. 拆分pass1, pass2为两个文件
 
 ## Getting Started with the code 
 

@@ -153,7 +153,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_los
         optimizer.step(closure)
         i_iter += 1
 
-    return native_img
+    return native_img # 1 * 3 * H * W 
 
 
 def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
@@ -259,7 +259,7 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return native_img
+    return native_img # 1 * 3 * H * W 
 
 
 def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
@@ -373,7 +373,7 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return native_img
+    return native_img # 1 * 3 * H * W 
 
 
 def main():

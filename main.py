@@ -90,18 +90,28 @@ def preprocess(cfg):
     return native_img, style_img, tight_mask, loss_mask, device
 
 
-def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net):
+def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass):
+    if which_pass == 'pass1':
+        pass_n_iter = cfg.p1_n_iters
+        output_img = cfg.p1_output_img
+    elif which_pass == 'pass2':
+        pass_n_iter = cfg.p2_n_iters
+        output_img = cfg.p2_output_img
+    else:
+        print('Invalid pass')
+        exit(1)
+
     def periodic_print(i_iter, c_loss, s_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
             print('Iteration {:08d} ; Content Loss {:.06f}; Style Loss {:.06f}; Total Loss {:.06f}'.format(
                 i_iter, c_loss.item(), s_loss.item(), total_loss.item()))
 
     def periodic_save(i_iter):
-        flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.p1_n_iters)
+        flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == pass_n_iter)
         if flag:
             print('Iteration {:08d} Save Intermediate IMG'.format(i_iter))
-            output_filename, file_extension = os.path.splitext(cfg.p1_output_img)
-            if i_iter == cfg.p1_n_iters:
+            output_filename, file_extension = os.path.splitext(output_img)
+            if i_iter == pass_n_iter:
                 filename = output_filename + str(file_extension)
             else:
                 filename = str(output_filename) + "_iter_{:08d}".format(i_iter) + str(file_extension)
@@ -244,7 +254,7 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     print('\n===> Start Updating Image')
     start_time = time.time()
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net)
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass='pass1')
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -358,7 +368,7 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
     print('\n===> Start Updating Image')
     start_time = time.time()
 
-    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net)
+    native_img = train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass='pass2')
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -370,8 +380,8 @@ def main():
     cfg = get_args()
     # orig_stdout = init_log()
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
-    pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
-    pass2(cfg, device, native_img, style_img, tight_mask, loss_mask)
+    native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
+    native_img_final = pass2(cfg, device, native_img_inter, style_img, tight_mask, loss_mask)
     # end_log(orig_stdout)
 
 

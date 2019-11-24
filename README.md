@@ -46,6 +46,14 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 13. (zw) Code formatting 
 
+14. 存下来pass1现在有的问题，然后在progress report上说找到了问题
+
+15. pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  
+
+16. 需要更改 pass2 的match的部分 (upsampler_corr)
+
+17. pass2 match 流程
+
 ## Getting Started with the code 
 
 * Dependency 

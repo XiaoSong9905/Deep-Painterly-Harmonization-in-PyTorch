@@ -166,7 +166,7 @@ class GramMatrix(nn.Module):
 
 class StyleLossPass1(nn.Module):
     def __init__(self, style_weight, layer_mask, match_patch_size, stride=3):
-        super().__init__()
+        super(StyleLossPass1, self).__init__()
         self.weight = style_weight
         self.critertain = nn.MSELoss()
         self.gram = GramMatrix()

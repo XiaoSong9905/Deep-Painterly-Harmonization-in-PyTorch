@@ -149,7 +149,7 @@ def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_los
     # TODO
     # Addd schedular for this model, the output doesn't seem to converge
     i_iter = 0
-    while i_iter <= cfg.p1_n_iters:
+    while i_iter <= pass_n_iter:
         optimizer.step(closure)
         i_iter += 1
 

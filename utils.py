@@ -194,30 +194,30 @@ def conv2d_same_padding(input, filter, stride=1):
     :return: output: 1 * C * H * W
     '''
     _, _, H, W = input.shape
-    F = filter.shape[2]
 
     out_rows = (H + stride - 1) // stride
-    padding_rows = max(0, (out_rows - 1) * stride + F - H)
+    padding_rows = max(0, (out_rows - 1) * stride + filter.shape[2] - H)
     rows_odd = (padding_rows % 2 != 0)
     out_cols = (W + stride - 1) // stride
-    padding_cols = max(0, (out_cols - 1) * stride + F - W)
+    padding_cols = max(0, (out_cols - 1) * stride + filter.shape[3] - W)
     cols_odd = (padding_rows % 2 != 0)
 
     if rows_odd or cols_odd:
         input = F.pad(input, [0, int(cols_odd), 0, int(rows_odd)])
 
-    return F.conv2d(input, filter, stride, padding=(padding_rows // 2, padding_cols // 2))
+    return F.conv2d(input, filter, stride=stride, padding=(padding_rows // 2, padding_cols // 2))
 
 
-def get_patch(feature, pos_h, pos_w, patch_size=3):
+def get_patch(padding_feature, pos_h, pos_w, patch_size=3):
     '''
     return patch from feature at (pos_h, pos_w)
 
-    :param feature: 1 * C * H * W
+    :param padding_feature: 1 * C * (H + pad) * (W + pad)
     :param pos_h:
     :param pos_w:
     :param patch_size:
     :return: patch: 1 * C * patch_size * patch_size
     '''
-    dx = (patch_size - 1) // 2
-    return feature[:, :, pos_h - dx : pos_h + dx, pos_w - dx : pos_w + dx]
+    pos_h = int(pos_h)
+    pos_w = int(pos_w)
+    return padding_feature[:, :, pos_h : pos_h + patch_size, pos_w : pos_w + patch_size].clone()

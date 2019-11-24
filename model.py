@@ -17,7 +17,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time
-from utils import conv2d_same_padding, get_patch
+from utils import get_patch
 
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'pool1',
@@ -430,27 +430,29 @@ class StyleLossPass2(StyleLossPass1):
 
         stride = self.stride
         patch_size = self.patch_size
+        padding = (patch_size - 1) // 2
 
         # Step 1: Find matches for the reference layer.
         ref_h = style_fm.shape[2]  # height of the reference layer
         ref_w = style_fm.shape[3]  # width of the reference layer
-        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1  # the number of patches along height
-        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1  # the number of patches along width
+        n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
+        n_patch_w = math.floor(ref_w / stride)  # the number of patches along width
+        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding])
+        padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding])
 
-        corr_tmp = np.zeros(ref_h, ref_w)  # tmp variable, same as P in paper
-        ref_corr = np.zeros(ref_h, ref_w)  # Output
+        corr_tmp = np.zeros((ref_h, ref_w))  # tmp variable, same as P in paper
+        ref_corr = np.zeros((ref_h, ref_w))  # Output
         # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
 
         # for each patch
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # a patch in content fm
-                patch = img_fm[:, :, i * patch_size:(i + 1) * patch_size,
-                        j * patch_size:(j + 1) * patch_size]
+                patch = get_patch(padding_img_fm, i, j, patch_size)
 
                 # Compute score map for each content fm patch
-                score_map = conv2d_same_padding(style_fm, patch, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
-                assert (score_map.shape == style_fm.shape)
+                score_map = F.conv2d(style_fm, patch, stride=stride, padding=padding)
+                assert (score_map.shape[2:] == style_fm.shape[2:])
                 score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
                 corr_tmp[i, j] = torch.argmax(score_map).item()
 
@@ -483,15 +485,27 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm, c_h, c_w, patch_size)  # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(padding_style_fm, c_h, c_w, patch_size)  # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:
                         for dj in [-1, 0, 1]:
+                            # skip if out of bounds
+                            if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
+                                continue
+
                             patch_idx = corr_tmp[i + di, j + dj]
                             patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
+
+                            # skip if out of bounds
+                            if patch_pos[0] < 0 \
+                                    or patch_pos[0] >= n_patch_h \
+                                    or patch_pos[1] < 0 \
+                                    or patch_pos[1] >= n_patch_w:
+                                continue
+
                             # get patch from style_fm at (patch_pos[0], patch_pos[1])
-                            style_fm_ref_p = get_patch(style_fm, patch_pos[0], patch_pos[1], patch_size)
+                            style_fm_ref_p = get_patch(padding_style_fm, patch_pos[0], patch_pos[1], patch_size)
                             sum += F.conv2d(style_fm_ref_c, style_fm_ref_p).item()
 
                     if sum < min_sum:
@@ -503,11 +517,11 @@ class StyleLossPass2(StyleLossPass1):
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # Find matched index in style fm
-                matched_style_idx = (ref_corr[i, j] // ref_w, ref_corr % ref_w)
+                matched_style_idx = (int(ref_corr[i, j]) // ref_w, int(ref_corr[i, j]) % ref_w)
                 #  1 * C * 3 * 3
                 style_fm_matched[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]]
 
-        return ref_corr, style_fm_matched
+        return ref_corr.astype(np.int), style_fm_matched
 
     def upsample_corr(self, ref_corr, curr_h, curr_w, style_fm):
         '''

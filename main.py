@@ -368,11 +368,11 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
 
 def main():
     cfg = get_args()
-    orig_stdout = init_log()
+    # orig_stdout = init_log()
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
     pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
     pass2(cfg, device, native_img, style_img, tight_mask, loss_mask)
-    end_log(orig_stdout)
+    # end_log(orig_stdout)
 
 
 if __name__ == '__main__':

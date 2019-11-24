@@ -49,7 +49,7 @@ def get_args():
     # Model Parameter
     parser.add_argument("-p1_content_layers", help="layers for content", default='relu4_2')
     parser.add_argument("-p1_style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1')
-    parser.add_argument("-p2_content_layers", help="single layer for content", default='relu4_2')
+    parser.add_argument("-p2_content_layers", help="single layer for content", default='relu4_1')
     parser.add_argument("-p2_style_layers", help="single layer for style", default='relu1_1,relu2_1,relu3_1,relu4_1')
     parser.add_argument("-content_weight", type=float, default=5)
     parser.add_argument("-style_weight", type=float,

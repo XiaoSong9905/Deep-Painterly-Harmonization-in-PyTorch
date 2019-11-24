@@ -301,7 +301,7 @@ class StyleLossPass2(StyleLossPass1):
                 return input
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
-            self.curr_corr, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
+            _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
@@ -321,99 +321,6 @@ class StyleLossPass2(StyleLossPass1):
             self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
 
         return input
-
-    # TODO To be delete when finished
-    def consistent_mapping(self, style_fm_dict, img_fm_dict, layers, ref_layer='relu4_1'):
-        # TODO conv4_1 or relu4_1?
-        # after conv, normalize, loc: cuda_utils line 1260
-
-        '''
-        Input :
-            style_fm_dict: dict, style_fm_dict[layer_i] = 1 * C_i * H_i * W_i
-            img_fm_dict: dict, img_fm_dict[layer_i] = 1 * C_i * H_i * W_i
-            ref_layer: str, the name of the reference layer, default='conv4_1'
-
-        Output:
-            style_fm_masked_dict: dict, style_fm_masked_dict[layer_i] = 1 * C_i * H_i * W_i
-        '''
-
-        mapping = None  # NearestNeighborIndex for ref_layer: H_ref * W_ref
-        mapping_out = {}
-        stride = 1  # TODO
-        patch_size = 3  # TODO
-
-        # Step 1: Find matches for the reference layer.
-        style_fm_ref = style_fm_dict[ref_layer]
-        img_fm_ref = img_fm_dict[ref_layer]
-        ref_h = style_fm_ref.shape[2]
-        ref_w = style_fm_ref.shape[3]
-        n_patch_h = math.floor((ref_h - patch_size) / stride) + 1
-        n_patch_w = math.floor((ref_w - patch_size) / stride) + 1
-        ref_mapping = np.zeros(ref_h, ref_w)
-
-        for i in range(n_patch_h):
-            for j in range(n_patch_w):
-                # Each kernal represent a patch in content fm
-                kernel = img_fm_ref[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
-
-                # Compute score map for each content fm patch
-                score_map = conv2d_same_padding(style_fm_ref, kernel, stride=stride)  # 1 * 1 * n_patch_h * n_patch_w
-                assert (score_map.shape == style_fm_ref.shape)
-                score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
-                ref_mapping[i, j] = torch.argmax(score_map).item()
-
-        mapping = ref_mapping
-
-        # Step 2: Enforce spatial consistency.
-        for i in range(n_patch_h):
-            for j in range(n_patch_w):
-                # Initialize a set of candidate style patches.
-                candidate_set = set()
-
-                # For all adjacent patches, look up the corresponding style patch.
-                for di in [-1, 0, 1]:
-                    for dj in [-1, 0, 1]:
-                        if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
-                            continue
-
-                        patch_idx = mapping[i + di, j + dj]
-                        patch_pos = (patch_idx // n_patch_w - di, patch_idx % n_patch_w - dj)
-
-                        if patch_pos[0] < 0 \
-                                or patch_pos[0] >= n_patch_h \
-                                or patch_pos[1] < 0 \
-                                or patch_pos[1] >= n_patch_w:
-                            continue
-
-                        candidate_set.add((patch_pos[0], patch_pos[1]))
-
-                # Select the candidate the most similar to the style patches
-                # associated to the neighbors of p.
-                min_sum = np.inf
-                for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(style_fm_ref, c_h, c_w, patch_size)
-                    sum = 0
-                    for di in [-1, 0, 1]:
-                        for dj in [-1, 0, 1]:
-                            patch_idx = mapping[i + di, j + dj]
-                            patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
-                            style_fm_ref_p = get_patch(style_fm_ref, patch_pos[0], patch_pos[1], patch_size)
-                            sum += F.conv2d(style_fm_ref_c, style_fm_ref_p)
-
-                    if sum < min_sum:
-                        min_sum = sum
-                        mapping_out[ref_layer][i, j] = c_h * n_patch_w + c_w
-
-        # Step 3: Propagate the matches in the ref. layer to the other layers.
-        # TODO define layers
-        for layer in layers:
-            if layer == ref_layer:
-                continue
-
-            _, _, n_curr_h, n_curr_w = style_fm_dict[layer].shape
-            patch_mask = np.zeros(n_patch_h, n_patch_w)
-
-        return mapping_out
 
     def match_fm_ref(self, style_fm, img_fm):
         '''
@@ -485,7 +392,8 @@ class StyleLossPass2(StyleLossPass1):
                 # associated to the neighbors of p.
                 min_sum = np.inf
                 for c_h, c_w in candidate_set:
-                    style_fm_ref_c = get_patch(padding_style_fm, c_h, c_w, patch_size)  # get patch from style_fm at (c_h, c_w)
+                    style_fm_ref_c = get_patch(padding_style_fm, c_h, c_w,
+                                               patch_size)  # get patch from style_fm at (c_h, c_w)
                     sum = 0
 
                     for di in [-1, 0, 1]:

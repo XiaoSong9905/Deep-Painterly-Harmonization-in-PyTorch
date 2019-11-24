@@ -50,7 +50,7 @@ def get_args():
     parser.add_argument("-p1_content_layers", help="layers for content", default='relu4_2')
     parser.add_argument("-p1_style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1')
     parser.add_argument("-p2_content_layers", help="single layer for content", default='relu4_2')
-    parser.add_argument("-p2_style_layers", help="single layer for style", default='relu4_2')
+    parser.add_argument("-p2_style_layers", help="single layer for style", default='relu1_1,relu2_1,relu3_1,relu4_1')
     parser.add_argument("-content_weight", type=float, default=5)
     parser.add_argument("-style_weight", type=float,
                         default=100)  # can setup content loss, style loss seprately for pass1 pass2
@@ -262,7 +262,7 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     return native_img # 1 * 3 * H * W 
 
 
-def pass2(cfg, device, inter_img, native_img, style_img, tight_mask, loss_mask):
+def pass2(cfg, device, orgin_img, native_img, style_img, tight_mask, loss_mask):
     # Set up device and datatye 
     # TODO
     # Setup Network
@@ -325,16 +325,17 @@ def pass2(cfg, device, inter_img, native_img, style_img, tight_mask, loss_mask):
     print(net)
 
     print('\n===> Start Capture Content Image Feature Map')
+    print(len(content_loss_list), len(style_loss_list))
     for i in content_loss_list:
         i.mode = 'capture'
     net(native_img)
     
-    for i in content_layer_loss:
+    for i in content_loss_list:
         i.mode = 'None'
 
     for i in style_loss_list:
         i.mode = 'capture_content'
-    net(inter_img)
+    net(orgin_img)
 
     for i in style_loss_list:
         i.mode = 'None'
@@ -351,6 +352,13 @@ def pass2(cfg, device, inter_img, native_img, style_img, tight_mask, loss_mask):
         else:
             i.mode = 'capture_style_others'
     net(style_img)
+    tmp_ref_corr = None
+    for idx, i in reversed(list(enumerate(style_loss_list))):  # TODO: change ref layer, and other layers
+        if not i.mode == 'capture_style_ref':
+            i.set_ref_infor(tmp_ref_corr)
+        else:
+            tmp_ref_corr = i.get_ref_infor()
+            i.mode = 'None'
     net(style_img) # TODO: need purify since ref layer calculate twice
 
     time_elapsed = time.time() - start_time
@@ -388,8 +396,10 @@ def main():
     cfg = get_args()
     # orig_stdout = init_log()
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
-    native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
-    native_img_final = pass2(cfg, device, native_img_inter, native_img, style_img, tight_mask, loss_mask)
+    # native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
+    dtype, device = setup(cfg)
+    native_img_inter = img_preprocess('./tmp_pass1_res.jpg', cfg.output_img_size, dtype, device,cfg).type(dtype)
+    native_img_final = pass2(cfg, device, native_img, native_img_inter, style_img, tight_mask, loss_mask)
     # end_log(orig_stdout)
 
 

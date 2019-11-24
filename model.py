@@ -369,7 +369,7 @@ class StyleLossPass2(StyleLossPass1):
         ref_w = style_fm.shape[3]  # width of the reference layer
         n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
         n_patch_w = math.floor(ref_w / stride)  # the number of patches along width
-        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding], mode='reflect', )
+        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding], mode='reflect')
         padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding], mode='reflect')
 
         corr_tmp = np.zeros((ref_h, ref_w))  # tmp variable, same as P in paper

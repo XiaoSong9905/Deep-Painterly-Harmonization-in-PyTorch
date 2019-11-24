@@ -262,7 +262,7 @@ def pass1(cfg, device, native_img, style_img, tight_mask, loss_mask):
     return native_img # 1 * 3 * H * W 
 
 
-def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
+def pass2(cfg, device, inter_img, native_img, style_img, tight_mask, loss_mask):
     # Set up device and datatye 
     # TODO
     # Setup Network
@@ -327,9 +327,17 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
     print('\n===> Start Capture Content Image Feature Map')
     for i in content_loss_list:
         i.mode = 'capture'
+    net(native_img)
+    
+    for i in content_layer_loss:
+        i.mode = 'None'
+
     for i in style_loss_list:
         i.mode = 'capture_content'
-    net(native_img)
+    net(inter_img)
+
+    for i in style_loss_list:
+        i.mode = 'None'
 
     print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
     start_time = time.time()
@@ -381,7 +389,7 @@ def main():
     # orig_stdout = init_log()
     native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
     native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
-    native_img_final = pass2(cfg, device, native_img_inter, style_img, tight_mask, loss_mask)
+    native_img_final = pass2(cfg, device, native_img_inter, native_img, style_img, tight_mask, loss_mask)
     # end_log(orig_stdout)
 
 

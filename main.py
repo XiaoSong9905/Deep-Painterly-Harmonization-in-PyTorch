@@ -57,7 +57,7 @@ def get_args():
     parser.add_argument("-tv_weight", type=float, default=1e-3)
     parser.add_argument("-init", choices=['random', 'image'], default='image')
     parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default=None)
-    parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg16')
+    parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')
     parser.add_argument("-match_patch_size", type=int, default=3)
 
     # Other option

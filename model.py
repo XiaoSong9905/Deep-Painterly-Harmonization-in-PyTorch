@@ -317,8 +317,8 @@ class StyleLossPass1(nn.Module):
                 # Corresponding FM 
                 # Index into 4d Tensor : [b, c, y, x]
                 correspond_fm[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]] 
-                correspond_idx[0, i, j] = matched_style_idx[1]
-                correspond_idx[1, i, j] = matched_style_idx[0]
+                correspond_idx[0, i, j] = matched_style_idx[0]
+                correspond_idx[1, i, j] = matched_style_idx[1]
 
         assert(correspond_fm.shape == content_fm.shape)
 
@@ -400,7 +400,6 @@ class StyleLossPass2(StyleLossPass1):
         patch_size = self.patch_size
         padding = (patch_size - 1) // 2
 
-        # Step 1: Find matches for the reference layer.
         ref_h = style_fm.shape[2]  # height of the reference layer
         ref_w = style_fm.shape[3]  # width of the reference layer
         n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
@@ -408,22 +407,11 @@ class StyleLossPass2(StyleLossPass1):
         padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
         padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
 
-        corr_tmp = np.zeros((ref_h, ref_w))  # tmp variable, same as P in paper
-        ref_corr = np.zeros((ref_h, ref_w))  # Output
         # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
+        ref_corr = np.zeros((ref_h, ref_w))  # Output
 
-        # for each patch
-        for i in range(n_patch_h):
-            for j in range(n_patch_w):
-                # a patch in content fm
-                patch = get_patch(padding_img_fm, i, j, patch_size)
-
-                # TODO CHANGE PADDING HERE 
-                # Compute score map for each content fm patch
-                score_map = F.conv2d(style_fm, patch, stride=stride, padding=padding)
-                assert (score_map.shape[2:] == style_fm.shape[2:])
-                score_map = score_map[0, 0, :, :]  # n_patch_h * n_patch_w
-                corr_tmp[i, j] = torch.argmax(score_map).item()
+        # Step 1: Find matches for the reference layer.
+        _, corr_tmp = super().match_fm(img_fm, style_fm)
 
         # Step 2: Enforce spatial consistency.
         for i in range(n_patch_h):
@@ -439,7 +427,7 @@ class StyleLossPass2(StyleLossPass1):
                             continue
 
                         patch_idx = corr_tmp[i + di, j + dj]  # index of neighbor patch in style feature map
-                        patch_pos = (patch_idx // n_patch_w - di, patch_idx % n_patch_w - dj)
+                        patch_pos = (patch_idx[0] - di, patch_idx[1] - dj)
 
                         # skip if out of bounds
                         if patch_pos[0] < 0 \
@@ -465,7 +453,7 @@ class StyleLossPass2(StyleLossPass1):
                                 continue
 
                             patch_idx = corr_tmp[i + di, j + dj]
-                            patch_pos = (patch_idx // n_patch_w, patch_idx % n_patch_w)
+                            patch_pos = (patch_idx[0], patch_idx[1])
 
                             # skip if out of bounds
                             if patch_pos[0] < 0 \

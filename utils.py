@@ -90,9 +90,9 @@ def save_img_plt(img, path, gray=False):
     plt.close()
 
 
-def mask_preprocess(mask_file, out_shape, dtype, device, cfg, name='mask_preprocess.png'):
+def mask_preprocess(mask_file, out_shape, dtype, device):
     '''
-    Return : 1 * 1 * H * W Tensor for mask 
+    Return : 1 * 1 * H * W [0. - 1.] Tensor for mask 
     '''
     mask = Image.open(mask_file).convert('L')
 
@@ -101,7 +101,7 @@ def mask_preprocess(mask_file, out_shape, dtype, device, cfg, name='mask_preproc
 
     transform = transforms.Compose([
         transforms.Resize(out_shape),
-        transforms.ToTensor()
+        transforms.ToTensor() # [0.-1.]
     ])
 
     mask = transform(mask)
@@ -110,20 +110,13 @@ def mask_preprocess(mask_file, out_shape, dtype, device, cfg, name='mask_preproc
     mask[mask != 0] = 1
     mask = mask.unsqueeze(0)
 
-    '''
-    print('===>mask_preprocess')
-    print('for {}'.format(str(mask_file)))
-    print('output range : ', (torch.min(mask), torch.max(mask)))
-    print('output shape : ', mask.shape)
-    save_img_plt(mask, name, gray=True)
-    '''
-
     return mask 
 
 
-def img_preprocess(img_file, out_shape, dtype, device, cfg, name='img_preprocess.png'):
+def img_preprocess(img_file, out_shape, dtype, device):
     '''
-    Return : 1 * 3 * H * W Tensor for image  
+    Return : 1 * 3 * H * W [0. - 255.] Tensor for image  
+    Tensor already convert to dtype, and pass to device 
     '''
     img = Image.open(img_file).convert('RGB')
 
@@ -142,32 +135,36 @@ def img_preprocess(img_file, out_shape, dtype, device, cfg, name='img_preprocess
     img = img.type(dtype)
     img = img.unsqueeze(0)
 
-    '''
-    print('===>img_preprocess')
-    print('for {}'.format(str(img_file)))
-    print('output range : ', (torch.min(img), torch.max(img)))
-    print('output shape : ', img.shape)
-    save_img_plt(img, name)
-    '''
-
-    return img
+    return img # [0. - 255.]
 
 
 def img_deprocess(img_tensor):
     '''
     Input : 
-        img_tensor : 1 * 3 * H * W Tensor represent the updated image 
+        img_tensor : 1 * 3 * H * W Tensor represent the updated image [0.-255.]
     Notice : 
         remember to clone() the value when given as input to this function 
     Return : 
         PIL.Image 
     '''
     de_normalize = transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])
-    img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
-    # img_tensor.clamp_(0, 1)
+    img_tensor = de_normalize(img_tensor.clone().squeeze(0).cpu()) / 256
+    img_tensor.clamp_(0, 1)
     img = transforms.ToPILImage()(img_tensor)
 
     return img 
+
+def preprocess(cfg, dtype, device):
+
+    # Get input image and preprocess
+    content_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device) # 1 * 3 * H * W [0.-255.]
+    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device) # 1 * 3 * H * W [0.-255.]
+    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device) # 1 * 1 * H * W [0/1]
+    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device) # 1 * 1 * H * W [0/1]
+
+    content_img = nn.Parameter(content_img)
+
+    return content_img, style_img, tight_mask, loss_mask
 
 
 def display_masked_region(native_img, style_img, loss_mask):

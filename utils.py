@@ -55,6 +55,7 @@ def build_optimizer(cfg, img):
             can be build by passing image through `img = nn.Parameter(img)`
     '''
     # optimizer = torch.optim.SGD(model.parameters(), lr = 0.001)
+    assert(img.requires_grad==True)
     if cfg.optim == 'adam':
         optimizer = optim.Adam([img], cfg.lr)
     elif cfg.optim == 'lbfgs':
@@ -148,7 +149,7 @@ def img_deprocess(img_tensor):
         PIL.Image 
     '''
     de_normalize = transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])
-    img_tensor = de_normalize(img_tensor.clone().squeeze(0).cpu()) / 256
+    img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
     img_tensor.clamp_(0, 1)
     img = transforms.ToPILImage()(img_tensor)
 
@@ -163,6 +164,7 @@ def preprocess(cfg, dtype, device):
     loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device) # 1 * 1 * H * W [0/1]
 
     content_img = nn.Parameter(content_img)
+    content_img.requires_grad = True
 
     return content_img, style_img, tight_mask, loss_mask
 

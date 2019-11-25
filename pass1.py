@@ -17,7 +17,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import sys
-from model import *
+from model_style import *
 from utils import *
 
 if not os.path.exists('output'):
@@ -110,6 +110,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
 
         total_loss = s_loss + c_loss + tv_loss # loss value is already weighted 
         total_loss.backward()
+
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
         #content_img.grad = content_img.grad * loss_mask.expand_as(content_img)

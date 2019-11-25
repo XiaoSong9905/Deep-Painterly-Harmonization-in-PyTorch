@@ -62,6 +62,8 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     print('\n===> Start Updating Image')
     start_time = time.time()
 
+    net = net.to(device).eval()
+
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
             print('Iteration {:06d} ; Content Loss {:.06f}; Style Loss {:.06f}; TV Loss {:.06f}; Total Loss {:.06f}'.format(

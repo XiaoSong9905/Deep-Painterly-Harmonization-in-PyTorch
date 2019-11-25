@@ -332,8 +332,8 @@ class StyleLossPass2(StyleLossPass1):
     child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
     '''
 
-    def __init__(self, style_weight, layer_mask, match_patch_size, stride=1):
-        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size, stride)
+    def __init__(self, style_weight, layer_mask, match_patch_size, stride=1, device='cpu'):
+        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size, stride, device)
         self.ref_corr = None
         # TODO
 
@@ -407,7 +407,7 @@ class StyleLossPass2(StyleLossPass1):
         n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
         n_patch_w = math.floor(ref_w / stride)  # the number of patches along width
         padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
-        padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
+        # padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
 
         # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
         ref_corr = np.zeros((ref_h, ref_w))  # Output
@@ -428,7 +428,7 @@ class StyleLossPass2(StyleLossPass1):
                         if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                             continue
 
-                        patch_idx = corr_tmp[i + di, j + dj]  # index of neighbor patch in style feature map
+                        patch_idx = corr_tmp[:, i + di, j + dj]  # index of neighbor patch in style feature map
                         patch_pos = (patch_idx[0] - di, patch_idx[1] - dj)
 
                         # skip if out of bounds
@@ -454,7 +454,7 @@ class StyleLossPass2(StyleLossPass1):
                             if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                                 continue
 
-                            patch_idx = corr_tmp[i + di, j + dj]
+                            patch_idx = corr_tmp[:, i + di, j + dj]
                             patch_pos = (patch_idx[0], patch_idx[1])
 
                             # skip if out of bounds

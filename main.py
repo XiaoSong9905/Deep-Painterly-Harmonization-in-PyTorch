@@ -70,26 +70,6 @@ def get_args():
     return cfg
 
 
-def preprocess(cfg):
-    # Set up device datatye
-    dtype, device = setup(cfg)
-
-    # Get input image and preprocess
-    native_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device, cfg,  # 1 * 3 * H * W
-                                name='read_naive_img.png').type(dtype)
-    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device, cfg,  # 1 * 3 * H * W
-                               name='read_style_img.png').type(dtype)
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device, cfg,  # 1 * 1 * H * W
-                                 name='read_tight_mask.png').type(dtype)
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device, cfg,  # 1 * 1 * H * W
-                                name='read_loss_mask.png').type(dtype)
-
-    # Display Masked region to visualy understand which region will be transfered 
-    display_masked_region(native_img, style_img, loss_mask)
-
-    return native_img, style_img, tight_mask, loss_mask, device
-
-
 def train(cfg, native_img, loss_mask, content_loss_list, style_loss_list, tv_loss_list, device, net, which_pass):
     if which_pass == 'pass1':
         pass_n_iter = cfg.p1_n_iters
@@ -388,12 +368,15 @@ def pass2(cfg, device, native_img, style_img, tight_mask, loss_mask):
 
 
 def main():
-    cfg = get_args()
+    # Setip Log
     # orig_stdout = init_log()
-    native_img, style_img, tight_mask, loss_mask, device = preprocess(cfg)
-    # native_img_inter = pass1(cfg, device, native_img, style_img, tight_mask, loss_mask)
+
+    # Intial Config
+    cfg = get_args()
     dtype, device = setup(cfg)
-    native_img_inter = img_preprocess('./tmp_pass1_res.jpg', cfg.output_img_size, dtype, device, cfg).type(dtype)
+    content_img, style_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
+
+    native_img_inter = img_preprocess('./tmp_pass1_res.jpg', cfg.output_img_size, dtype, device).type(dtype)
     native_img_final = pass2(cfg, device, native_img_inter, style_img, tight_mask, loss_mask)
     # end_log(orig_stdout)
 

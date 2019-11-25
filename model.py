@@ -71,8 +71,6 @@ def build_backbone(cfg):
     return net, layer_list
 
 
-# Ziyan use class in order to match the format in this script. However, a function may better.
-# Xiao : the reason to use a class is to able to put the TVLoss class into the network that can forward, backward by simply model(img), loss.backward()
 class TVLoss(nn.Module):
     def __init__(self, tv_weight):
         super(TVLoss, self).__init__()
@@ -90,9 +88,13 @@ class TVLoss(nn.Module):
         #####################
         # Formula: $L_{tv} = w_t \times \left(\sum_{c=1}^3\sum_{i=1}^{H-1}\sum_{j=1}^{W} (x_{i+1,j,c} - x_{i,j,c})^2 + \sum_{c=1}^3\sum_{i=1}^{H}\sum_{j=1}^{W - 1} (x_{i,j+1,c} - x_{i,j,c})^2\right)$
         #####################
-        tmp_h = torch.sum((input[:, :, 1:, :] - input[:, :, :-1, :]) ** 2)
-        tmp_w = torch.sum((input[:, :, :, 1:] - input[:, :, :, :-1]) ** 2)
-        self.loss = self.weight * (tmp_h + tmp_w)
+        #tmp_h = torch.sum((input[:, :, 1:, :] - input[:, :, :-1, :]) ** 2)
+        #tmp_w = torch.sum((input[:, :, :, 1:] - input[:, :, :, :-1]) ** 2)
+        #self.loss = self.weight * (tmp_h + tmp_w)
+        #return input
+        self.x_diff = input[:,:,1:,:] - input[:,:,:-1,:]
+        self.y_diff = input[:,:,:,1:] - input[:,:,:,:-1]
+        self.loss = self.weight * (torch.sum(torch.abs(self.x_diff)) + torch.sum(torch.abs(self.y_diff)))
         return input
 
 
@@ -162,7 +164,7 @@ class GramMatrix(nn.Module):
 
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, style_weight, mask, match_patch_size, stride=3, device='cpu'):
+    def __init__(self, style_weight, mask, match_patch_size, stride=1, device='cpu'):
         super().__init__()
         self.weight = style_weight
         self.critertain = nn.MSELoss()

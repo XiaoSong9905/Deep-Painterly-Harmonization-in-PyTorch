@@ -108,7 +108,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
         total_loss.backward()
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
-        content_img.grad = content_img.grad * loss_mask.expand_as(content_img)
+        content_img.grad = content_img.grad * tight_mask.expand_as(content_img)
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss)
         periodic_save(i_iter)
@@ -180,7 +180,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
             # TODO style loss need more operation 
             # Match operation should be done at this stage, future forward backward only do the update 
             # See neural_gram.lua line 120 - 136 
-            style_layer_loss = StyleLossPass1(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=3, device=device)
+            style_layer_loss = StyleLossPass1(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 

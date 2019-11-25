@@ -162,7 +162,7 @@ class GramMatrix(nn.Module):
 
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, style_weight, mask, match_patch_size, stride=3):
+    def __init__(self, style_weight, mask, match_patch_size, stride=3, device='cpu'):
         super().__init__()
         self.weight = style_weight
         self.critertain = nn.MSELoss()
@@ -172,6 +172,7 @@ class StyleLossPass1(nn.Module):
         self.loss = None
         self.patch_size = match_patch_size
         self.stride = stride
+        self.device = device 
 
     def forward(self, input):
         '''
@@ -290,7 +291,7 @@ class StyleLossPass1(nn.Module):
 
         # Compute Style FM Norm 
         style_fm_norm = style_fm_pad**2 
-        kernal = torch.ones((1, c, patch_size, patch_size))
+        kernal = torch.ones((1, c, patch_size, patch_size)).to(self.device)
         style_fm_norm = F.conv2d(style_fm_norm, kernal, stride=stride, padding=0)
         style_fm_norm = style_fm_norm ** 0.5 # 1 * C * H * W 
 

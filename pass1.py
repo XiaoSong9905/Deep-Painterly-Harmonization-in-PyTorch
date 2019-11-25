@@ -177,7 +177,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
             # TODO style loss need more operation 
             # Match operation should be done at this stage, future forward backward only do the update 
             # See neural_gram.lua line 120 - 136 
-            style_layer_loss = StyleLossPass1(cfg.style_weight, mask, cfg.match_patch_size)
+            style_layer_loss = StyleLossPass1(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=3, device=device)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 

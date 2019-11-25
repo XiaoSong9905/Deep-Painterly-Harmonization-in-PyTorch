@@ -239,6 +239,8 @@ def main():
     # Training 
     inter_img = train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_loss_list, style_loss_list, tv_loss_list, net)
 
+    inter_img_pil = img_deprocess(inter_img)
+    inter_img_pil.save('final.png')
     # End Log 
     # end_log(orig_stdout)
 

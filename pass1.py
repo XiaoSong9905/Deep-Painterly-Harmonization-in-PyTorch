@@ -171,7 +171,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         # Add Loss layer 
         if layer_list[i] in content_layers:
             print('Add Content Loss at Position {}'.format(str(len(net))))
-            content_layer_loss = ContentLoss(cfg.content_weight, mask)
+            content_layer_loss = ContentLoss(content_weight=cfg.content_weight, mask=mask)
             net.add_module(str(len(net)), content_layer_loss)
             content_loss_list.append(content_layer_loss)
 

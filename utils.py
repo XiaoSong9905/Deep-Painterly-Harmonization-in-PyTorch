@@ -131,7 +131,8 @@ def img_preprocess(img_file, out_shape, dtype, device):
     normalize = transforms.Normalize(mean=[103.939, 116.779, 123.68], std=[1,1,1])
 
     img = transform(img)
-    img = normalize(img*256)
+    #img = normalize(img*256)
+    img = img * 256 
     img = img.to(device)
     img = img.type(dtype)
     img = img.unsqueeze(0)
@@ -149,8 +150,10 @@ def img_deprocess(img_tensor):
         PIL.Image 
     '''
     de_normalize = transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])
-    img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
+    #img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
+    img_tensor = img_tensor.squeeze(0).cpu() / 256
     #img_tensor.clamp_(0, 1)
+    # import pdb; pdb.set_trace()
     img = transforms.ToPILImage()(img_tensor)
 
     return img 

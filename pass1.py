@@ -66,8 +66,10 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
+            if type(tv_loss) != int:
+                tv_loss = tv_loss.item()
             print('Iteration {:06d} ; Content Loss {:.06f}; Style Loss {:.06f}; TV Loss {:.06f}; Total Loss {:.06f}'.format(
-                i_iter, c_loss.item(), s_loss.item(), tv_loss.item(), total_loss.item() ) )
+                i_iter, c_loss.item(), s_loss.item(), tv_loss, total_loss.item() ) )
 
     def periodic_save(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.n_iter)

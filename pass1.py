@@ -45,9 +45,10 @@ def get_args():
 
     # Model Parameter
     parser.add_argument("-content_layers", help="layers for content", default='relu4_1')
-    parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1')
-    parser.add_argument("-content_weight", type=float, default=5)
-    parser.add_argument("-style_weight", type=float, default=100) 
+    #parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1')
+    parser.add_argument("-style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1')
+    parser.add_argument("-content_weight", type=float, default=5e0)
+    parser.add_argument("-style_weight", type=float, default=1e2) 
     parser.add_argument("-tv_weight", type=float, default=1e-3)
     parser.add_argument("-init", choices=['random', 'image'], default='image')
     parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default=None)

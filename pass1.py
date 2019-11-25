@@ -81,7 +81,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
             else:
                 filename = str(output_filename) + "_iter_{:06d}".format(i_iter) + str(file_extension)
 
-            img_deprocessed = img_deprocess(content_img)
+            img_deprocessed = img_deprocess(content_img.clone())
             img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer

@@ -108,7 +108,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
         total_loss.backward()
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
-        content_img.grad = content_img.grad * tight_mask.expand_as(content_img)
+        #content_img.grad = content_img.grad * loss_mask.expand_as(content_img)
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss)
         periodic_save(i_iter)

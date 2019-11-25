@@ -132,7 +132,7 @@ class ContentLoss(nn.Module):
                 '''
                 return torch.mul(grad, self.mask)
 
-            input.register_hook(backward_variable_gradient_mask_hook_fn)
+            #input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 
@@ -227,7 +227,7 @@ class StyleLossPass1(nn.Module):
                 '''
                 return torch.mul(grad, self.mask)
 
-            input.register_hook(backward_variable_gradient_mask_hook_fn)
+            #input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

@@ -312,13 +312,13 @@ class StyleLossPass1(nn.Module):
 
                 # Find Maximal idx of score map 
                 idx = torch.argmax(score_map).item()
-                matched_style_idx = (int(idx // score_map.shape[1]), int(idx % score_map.shape[1])) # (x, y)
+                matched_style_idx = (int(idx // score_map.shape[1]), int(idx % score_map.shape[1])) # (y, x)
 
                 # Corresponding FM 
                 # Index into 4d Tensor : [b, c, y, x]
-                correspond_fm[:, :, i, j] = style_fm[:, :, matched_style_idx[1], matched_style_idx[0]] 
-                correspond_idx[0, i, j] = matched_style_idx[0]
-                correspond_idx[1, i, j] = matched_style_idx[1]
+                correspond_fm[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]] 
+                correspond_idx[0, i, j] = matched_style_idx[1]
+                correspond_idx[1, i, j] = matched_style_idx[0]
 
         assert(correspond_fm.shape == content_fm.shape)
 

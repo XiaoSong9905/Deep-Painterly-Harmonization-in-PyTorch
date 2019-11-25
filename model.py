@@ -183,36 +183,47 @@ class StyleLossPass1(nn.Module):
             2. During update image, set `self.mode = 'loss'` to compute loss between content image gram matrix and stle image gram matrix 
                & return input
         '''
-        # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
-        if self.mode == 'capture_style':  #
-            style_fm = input.detach()
-            print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
-
-            # Compute Match 
-            style_fm_matched = self.match_fm(style_fm, self.content_fm)
-            print('StyleLossPass1 compute match relation')
-
-            # Compute Gram Matrix 
-            style_fm_matched_masked = torch.mul(style_fm_matched, self.mask)
-            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
-            print('StyleLossPass1 compute style gram matrix')
-
-            del self.content_fm
-            del style_fm
-
         # Step 1 : Capture Content Feature Map  
-        elif self.mode == 'capture_content':
+        if self.mode == 'capture_content':
             self.content_fm = input.detach()
             print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
             self.mask = self.mask.expand_as(self.content_fm)
 
+        # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
+        elif self.mode == 'capture_style':  #
+            style_fm = input.detach()
+            print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
+
+            # Compute Match 
+            correspond_fm, correspond_idx  = self.match_fm(style_fm, self.content_fm)
+            print('StyleLossPass1 compute match relation')
+
+            # Compute Gram Matrix 
+            correspond_fm_masked = torch.mul(correspond_fm, self.mask)
+            self.target_gram = self.gram(correspond_fm_masked) / torch.sum(self.mask)
+            print('StyleLossPass1 compute style gram matrix')
+
+            del self.content_fm
+            del style_fm
+
         # Step 3 : during updateing image 
         elif self.mode == 'loss':
             self.img_gram = self.gram(torch.mul(input, self.mask))
             self.img_gram = self.img_gram / torch.sum(self.mask)
-            self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
+            self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
+
+            def backward_variable_gradient_mask_hook_fn(grad):
+                '''
+                Functionality : 
+                    Return Gradient only over masked region
+                Notice : 
+                    Variable hook is used in this case, Module hook is not supported for `complex moule` 
+                '''
+                return torch.mul(grad, self.mask)
+
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 
@@ -224,49 +235,58 @@ class StyleLossPass1(nn.Module):
         Process:
             Instead of only compute the match for pixel inside the mask, here we compute the 
                 match for the whole feature map and use mask to filter out the matched pixel we don't need 
-            Patch Match is done in convolution fashion where content image's patch is used as kernal and applied 
-                to the styled image, a score map will be computed (w.r.t each content fm patch) and we construct the 
+            Patch Match is done in convolution fashion where content image's fm patch is used as kernal and applied 
+                to the styled image fm, a score map will be computed (w.r.t each content fm location) and we construct the 
                 matched style feature map using the score map we get for each content fm patch 
+            After compute score map using covolutiopn, a normalization process is used to avoid overfloat and local maximal issue
+        
+        Score Map Normalize Process:
+            patch1 : 3 * 3 
+            patch2 : 3 * 3 
+            score = sum(patch1 * patch2)
+            norm1 = sum(patch1**2)**0.5 
+            norm2 = sum(patch2**2)**0.5 
+            score = score / (norm1 * norm2 + 1e-9)
+
+            When used at fm level, 
+                # norm_style = style_fm_pad**2 
+                # norm_style = conv(norm_style, kernal=3*3(1))
+                # norm_style = norm_style ** 0.5 
+                # For each location i in content_fm_pad 
+                #     kernal = patch = 3 * 3 patch around location i 
+                #     score_map = conv(style_fm_pad, kernal, stride=1)
+                #     norm_kernal = sum(kernal**2)**0.5 
+                #     score_map = score_map / (norm_style * norm_kernal + 1e-9 )
+                #     correspondence_idx = argmax(score_map)  -> (x, y)
+                #     correspondence = style_fm(idx)
+
+        Notice : 
+            to index into 4d Tensor [b, c, y, x] is used
         
         Output:
-            style_fm_masked : 1 * C * H * W
-                Step1 : compute corresponding feature map for whole content img feature map 
-                Step2 : masked the matched feature map
-
+            correspond_fm  1 * C * H * W，
+            correspond_idx  2 * H * W first channel represent x index, second channel represent y index       
         '''
         # Padding Style FM & Content FM 
         stride = self.stride
         patch_size = self.patch_size 
         padding = (patch_size - 1) // 2 
-        c1, h1, w1 = content_fm[1], content_fm[2], content_fm[3]
-        c2, h2, w2 = style_fm[1], style_fm[2], style_fm[3]
+        c1, h1, w1 = content_fm.shape[1], content_fm.shape[2], content_fm.shape[3]
+        c2, h2, w2 = style_fm.shape[1], style_fm.shape[2], style_fm.shape[3]
         c, h, w = c1, h1, w1 
 
         # It's not nessary for two feature map to share the same spatial dimention
         # but in this project we enforce that for better quantititive result 
-        assert(c1 == c2)
-        assert(h1 == h2) 
-        assert(w1 == w2)
+        assert(content_fm.shape == style_fm.shape)
 
         n_patch_h = math.floor(h / stride)  # use math package to avoid potential python2 issue
         n_patch_w = math.floor(w / stride)
 
-        style_fm_pad = F.pad(style_fm, padding, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
-        content_fm_pad = F.pad(content_fm, padding, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
+        style_fm_pad = F.pad(style_fm, (padding, )*4, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
+        content_fm_pad = F.pad(content_fm, (padding, )*4, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
 
-        correspond_fm = torch.zeros_like(style_fm) # 1 * C * H * W
+        correspond_fm =  style_fm.clone() # 1 * C * H * W
         correspond_idx = torch.zeros((2, h, w)) # 2 * H * W where first layer is x, second layer is y 
-
-        # For each pixel i in content_fm_pad 
-        #     kernal = patch = 3 * 3 pixels around pixel i 
-        #     score_map = conv(style_fm_pad, kernal, stride=1)
-        #     norm_kernal = sum(kernal**2)**0.5 
-        #     norm_style = style_fm_pad**2 
-        #     norm_style = conv(norm_style, kernal=3*3(1))
-        #     norm_style = norm_style ** 0.5 
-        #     score_map = score_map / (norm_style * norm_kernal) + 1e-9
-        #     correspondence_idx = argmax idx (score_map)
-        #     correspondence = style_fm(idx)
 
         # Compute Style FM Norm 
         style_fm_norm = style_fm_pad**2 
@@ -284,10 +304,10 @@ class StyleLossPass1(nn.Module):
 
                 # Compute score map for each content fm patch kernal 
                 score_map = F.conv2d(style_fm_pad, kernal, stride=stride, padding=0) # 1 * C * H * W 
-                score_map = score_map[0, 0, :, :]  # 1 * 1 * H * W -> H * W 
 
                 # Normalize score map 
                 score_map = score_map / (kernal_norm * style_fm_norm + 1e-9)
+                score_map = score_map[0, 0, :, :]  # 1 * 1 * H * W -> H * W 
 
                 # Find Maximal idx of score map 
                 idx = torch.argmax(score_map).item()
@@ -295,11 +315,13 @@ class StyleLossPass1(nn.Module):
 
                 # Corresponding FM 
                 # Index into 4d Tensor : [b, c, y, x]
-                correspond_fm = style_fm[:, :, matched_style_idx[1], matched_style_idx[0]] 
+                correspond_fm[:, :, i, j] = style_fm[:, :, matched_style_idx[1], matched_style_idx[0]] 
                 correspond_idx[0, i, j] = matched_style_idx[0]
                 correspond_idx[1, i, j] = matched_style_idx[1]
 
-        return correspond_fm, correspond_idx
+        assert(correspond_fm.shape == content_fm.shape)
+
+        return correspond_fm, correspond_idx # 1 * C * H * W， 2 * H * W (first channel is x)
 
 
 class StyleLossPass2(StyleLossPass1):
@@ -329,7 +351,7 @@ class StyleLossPass2(StyleLossPass1):
             print('StyleLossPass2 compute match relation')
             # Compute Gram Matrix
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
-            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
@@ -341,7 +363,7 @@ class StyleLossPass2(StyleLossPass1):
             _, _, curr_H, curr_W = input.shape
             _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
-            self.style_matched_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             print('StyleLossPass2 compute style gram matrix')
 
         # Step 1 : Capture Content Feature Map
@@ -356,7 +378,7 @@ class StyleLossPass2(StyleLossPass1):
         elif self.mode == 'loss':
             self.img_gram = self.gram(torch.mul(input, self.mask))
             self.img_gram = self.img_gram / torch.sum(self.mask)
-            self.loss = self.critertain(self.img_gram, self.style_matched_gram) * self.weight
+            self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
 
         return input
 

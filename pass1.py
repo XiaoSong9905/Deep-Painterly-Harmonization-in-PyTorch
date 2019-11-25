@@ -63,6 +63,9 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     start_time = time.time()
 
     net = net.to(device).eval()
+    for param in net.parameters():
+        param.requires_grad = False
+        
     content_img = nn.Parameter(content_img)
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):

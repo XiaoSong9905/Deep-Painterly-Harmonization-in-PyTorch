@@ -56,6 +56,12 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 18. 拆分pass1, pass2为两个文件
 
+19. optimizer 不一样
+
+20. pass1中是否有histogram loss / total variance loss
+
+21. 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的
+
 ## Getting Started with the code 
 
 * Dependency 

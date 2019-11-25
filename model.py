@@ -132,7 +132,7 @@ class ContentLoss(nn.Module):
                 '''
                 return torch.mul(grad, self.mask)
 
-            #input.register_hook(backward_variable_gradient_mask_hook_fn)
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 
@@ -153,14 +153,17 @@ class GramMatrix(nn.Module):
         Output : 
             output : 1 * (C * C), represent gram matrix 
         '''
-        B, C, H, W = input.shape
-        output = torch.zeros((B, C, C))
-
-        for i in range(B):
-            fm_flat = input[i].view(C, H * W)
-            output[i] = torch.mm(fm_flat, fm_flat.t())
-
-        return output
+        #B, C, H, W = input.shape
+        #output = torch.zeros((B, C, C))
+        #
+        #for i in range(B):
+        #    fm_flat = input[i].view(C, H * W)
+        #    output[i] = torch.mm(fm_flat, fm_flat.t())
+        #
+        #return output
+        B, C, H, W = input.size()
+        x_flat = input.view(C, H * W)
+        return torch.mm(x_flat, x_flat.t())
 
 
 class StyleLossPass1(nn.Module):
@@ -197,6 +200,7 @@ class StyleLossPass1(nn.Module):
         # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
         elif self.mode == 'capture_style':  #
             style_fm = input.detach()
+            assert(style_fm.shape == self.content_fm.shape)
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match 
@@ -205,8 +209,8 @@ class StyleLossPass1(nn.Module):
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 
-            correspond_fm_masked = torch.mul(correspond_fm, self.mask)
-            self.target_gram = self.gram(correspond_fm_masked) / torch.sum(self.mask)
+            self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
+            self.target = self.G.detach()
             print('StyleLossPass1 compute style gram matrix')
 
             del self.content_fm
@@ -214,9 +218,9 @@ class StyleLossPass1(nn.Module):
 
         # Step 3 : during updateing image 
         elif self.mode == 'loss':
-            self.img_gram = self.gram(torch.mul(input, self.mask))
-            self.img_gram = self.img_gram / torch.sum(self.mask)
-            self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
+            self.G = self.gram(torch.mul(input, self.mask))
+            self.G = self.G / torch.sum(self.mask)
+            self.loss = self.critertain(self.G, self.target) * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
@@ -227,7 +231,7 @@ class StyleLossPass1(nn.Module):
                 '''
                 return torch.mul(grad, self.mask)
 
-            #input.register_hook(backward_variable_gradient_mask_hook_fn)
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

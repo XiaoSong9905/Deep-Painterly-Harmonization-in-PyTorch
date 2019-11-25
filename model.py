@@ -270,6 +270,9 @@ class StyleLossPass1(nn.Module):
             correspond_fm  1 * C * H * W，
             correspond_idx  2 * H * W first channel represent x index, second channel represent y index       
         '''
+
+        return style_fm, 0
+
         # Padding Style FM & Content FM 
         stride = self.stride
         patch_size = self.patch_size 

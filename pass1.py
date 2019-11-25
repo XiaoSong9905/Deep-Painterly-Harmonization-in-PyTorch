@@ -63,6 +63,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     start_time = time.time()
 
     net = net.to(device).eval()
+    content_img = nn.Parameter(content_img)
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:

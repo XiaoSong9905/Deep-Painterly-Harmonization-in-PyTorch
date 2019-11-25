@@ -63,7 +63,10 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     start_time = time.time()
 
     net = net.to(device).eval()
-    content_img = nn.Parameter(content_img)
+    for param in net.parameters():
+        param.requires_grad = False
+    img = content_img.clone()
+    img = nn.Parameter(img)
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
@@ -82,14 +85,14 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
             else:
                 filename = str(output_filename) + "_iter_{:06d}".format(i_iter) + str(file_extension)
 
-            img_deprocessed = img_deprocess(content_img.clone())
+            img_deprocessed = img_deprocess(img.clone())
             img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer
     def closure():
 
         optimizer.zero_grad()
-        _ = net(content_img)
+        _ = net(img)
 
         c_loss = 0
         s_loss = 0
@@ -108,12 +111,12 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
         total_loss.backward()
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
-        content_img.grad = content_img.grad * loss_mask.expand_as(content_img)
+        img.grad = img.grad * loss_mask.expand_as(img)
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss)
         periodic_save(i_iter)
 
-    optimizer = build_optimizer(cfg, content_img)
+    optimizer = build_optimizer(cfg, img)
     i_iter = 0
     while i_iter <= cfg.n_iter:
         optimizer.step(closure)

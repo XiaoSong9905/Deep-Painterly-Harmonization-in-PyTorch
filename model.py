@@ -426,7 +426,7 @@ class StyleLossPass2(StyleLossPass1):
                         if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                             continue
 
-                        patch_idx = corr_tmp[i + di, j + dj]  # index of neighbor patch in style feature map
+                        patch_idx = corr_tmp[:, i + di, j + dj]  # index of neighbor patch in style feature map
                         patch_pos = (patch_idx[0] - di, patch_idx[1] - dj)
 
                         # skip if out of bounds
@@ -452,7 +452,7 @@ class StyleLossPass2(StyleLossPass1):
                             if i + di < 0 or i + di >= n_patch_h or j + dj < 0 or j + dj >= n_patch_w:
                                 continue
 
-                            patch_idx = corr_tmp[i + di, j + dj]
+                            patch_idx = corr_tmp[:, i + di, j + dj]
                             patch_pos = (patch_idx[0], patch_idx[1])
 
                             # skip if out of bounds

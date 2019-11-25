@@ -251,42 +251,55 @@ class StyleLossPass1(nn.Module):
         n_patch_h = math.floor(h / stride)  # use math package to avoid potential python2 issue
         n_patch_w = math.floor(w / stride)
 
-        content_fm_orig = content_fm.clone()
-        style_fm_orig = style_fm.clone()
+        style_fm_pad = F.pad(style_fm, padding, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
+        content_fm_pad = F.pad(content_fm, padding, mode='reflect') # 1 * C * (H + 2 * padding) * (W + 2 * padding)
 
-        content_fm = F.pad()
+        correspond_fm = torch.zeros_like(style_fm) # 1 * C * H * W
+        correspond_idx = torch.zeros((2, h, w)) # 2 * H * W where first layer is x, second layer is y 
 
+        # For each pixel i in content_fm_pad 
+        #     kernal = patch = 3 * 3 pixels around pixel i 
+        #     score_map = conv(style_fm_pad, kernal, stride=1)
+        #     norm_kernal = sum(kernal**2)**0.5 
+        #     norm_style = style_fm_pad**2 
+        #     norm_style = conv(norm_style, kernal=3*3(1))
+        #     norm_style = norm_style ** 0.5 
+        #     score_map = score_map / (norm_style * norm_kernal) + 1e-9
+        #     correspondence_idx = argmax idx (score_map)
+        #     correspondence = style_fm(idx)
 
-        style_fm_matched = style_fm.clone()
+        # Compute Style FM Norm 
+        style_fm_norm = style_fm_pad**2 
+        kernal = torch.ones((1, c, patch_size, patch_size))
+        style_fm_norm = F.conv2d(style_fm_norm, kernal, stride=stride, padding=0)
+        style_fm_norm = style_fm_norm ** 0.5 # 1 * C * H * W 
 
+        # Compute Score Map for each location on content_fm
+        for i in range(n_patch_h): # H (y)
+            for j in range(n_patch_w): # W (x)
 
-        stride = self.stride
-        patch_size = self.patch_size
-
-        for i in range(n_patch_h):
-            for j in range(n_patch_w):
                 # Each kernal represent a patch in content fm 
-                kernal = content_fm[:, :, i * patch_size:(i + 1) * patch_size, j * patch_size:(j + 1) * patch_size]
+                kernal = content_fm_pad[:, :, i:i+patch_size, j:j+patch_size].clone()
+                kernal_norm = torch.sum(kernal**2)**0.5
 
                 # Compute score map for each content fm patch kernal 
-                score_map = F.conv2d(style_fm, kernal, stride=stride)
-                score_map = score_map[0, 0, :, :]  # 1 * 1 * n_patch_h * n_patch_w ->  1 * 1 * n_patch_h * n_patch_w
+                score_map = F.conv2d(style_fm_pad, kernal, stride=stride, padding=0) # 1 * C * H * W 
+                score_map = score_map[0, 0, :, :]  # 1 * 1 * H * W -> H * W 
 
-                # Find Maximal idx output score map 
+                # Normalize score map 
+                score_map = score_map / (kernal_norm * style_fm_norm + 1e-9)
+
+                # Find Maximal idx of score map 
                 idx = torch.argmax(score_map).item()
-                matched_style_idx = (int(idx / score_map.shape[1]), int(idx % score_map.shape[1]))
+                matched_style_idx = (int(idx // score_map.shape[1]), int(idx % score_map.shape[1])) # (x, y)
 
-                # Find matched patch in style fm 
-                matched_style_patch = style_fm[:, :,
-                                      matched_style_idx[0] * patch_size: (matched_style_idx[0] + 1) * patch_size, \
-                                      matched_style_idx[1] * patch_size: (matched_style_idx[1] + 1) * patch_size]
-                #  1 * C * 3 * 3
+                # Corresponding FM 
+                # Index into 4d Tensor : [b, c, y, x]
+                correspond_fm = style_fm[:, :, matched_style_idx[1], matched_style_idx[0]] 
+                correspond_idx[0, i, j] = matched_style_idx[0]
+                correspond_idx[1, i, j] = matched_style_idx[1]
 
-                style_fm_matched[:, :,
-                i * patch_size:(i + 1) * patch_size,
-                j * patch_size:(j + 1) * patch_size] = matched_style_patch
-
-        return style_fm_matched
+        return correspond_fm, correspond_idx
 
 
 class StyleLossPass2(StyleLossPass1):
@@ -382,6 +395,7 @@ class StyleLossPass2(StyleLossPass1):
                 # a patch in content fm
                 patch = get_patch(padding_img_fm, i, j, patch_size)
 
+                # TODO CHANGE PADDING HERE 
                 # Compute score map for each content fm patch
                 score_map = F.conv2d(style_fm, patch, stride=stride, padding=padding)
                 assert (score_map.shape[2:] == style_fm.shape[2:])
@@ -452,6 +466,7 @@ class StyleLossPass2(StyleLossPass1):
                 # Find matched index in style fm
                 matched_style_idx = (int(ref_corr[i, j]) // ref_w, int(ref_corr[i, j]) % ref_w)
                 #  1 * C * 3 * 3
+                # TODO MAYBE WRONG 
                 style_fm_matched[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]]
 
         return ref_corr.astype(np.int), style_fm_matched

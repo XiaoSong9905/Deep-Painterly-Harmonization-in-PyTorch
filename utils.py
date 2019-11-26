@@ -18,9 +18,11 @@ import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import sys 
 
-def init_log():
+def init_log(cfg):
     orig_stdout = sys.stdout
-    sys.stdout = open('log.txt','w')
+
+    if cfg.log_on == 'on':
+        sys.stdout = open('log.txt','w')
 
     message = "Deep Painterly Harmonization log file\n\
     \'===>\' : Begin of Specific Stage \n\
@@ -48,6 +50,46 @@ def setup(cfg):
 
     return dtype, device
 
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    # Input Output
+    parser.add_argument("-style_image", help="./path/file to style image", default='data/0_target.jpg')
+    parser.add_argument("-native_image", help="./path/file to simple stich image", default='data/0_naive.jpg')
+    parser.add_argument("-tight_mask", help="./path/file to tight mask", default='data/0_c_mask.jpg')
+    parser.add_argument("-dilated_mask", help="./path/file to dilated(loss) mask", default='data/0_c_mask_dilated.jpg')
+    parser.add_argument("-output_img", help="./path/file for output image", default='output/0_pass1_out.png')
+    parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int,
+                        default=512)
+
+    # Training Parameter
+    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam') # lbfgs currently not support 
+    parser.add_argument("-lr", type=float, default=1e0)
+    parser.add_argument("-n_iter", type=int, default=1000)
+    parser.add_argument("-print_interval", type=int, default=150) 
+    parser.add_argument("-save_img_interval", type=int, default=50)
+    parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
+
+    # Model Parameter
+    parser.add_argument("-content_layers", help="layers for content", default='relu4_2')
+    parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1') # Layer choice for Deep Paintely Harmonization 
+    #parser.add_argument("-style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1') # Layer choice for A Neural Algorithm of Artistic Style by Leon A. Gatys
+    parser.add_argument("-content_weight", type=float, default=5e0)
+    parser.add_argument("-style_weight", type=float, default=1e2) 
+    parser.add_argument("-tv_weight", type=float, default=1e-3)
+    parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default='./models/vgg19-d01eb7cb.pth')
+    parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')
+    parser.add_argument("-match_patch_size", type=int, default=3)
+
+    # Other 
+    parser.add_argument("-mask_on", choices=['on', 'off'], default='on') # if 'off' is choose, no mask is use, match is computed between whole content image fm and style image fm
+    parser.add_argument('-log_on', choices=['on', 'off'], default='off') # if 'on' is choose, redirect output to log file 
+    parser.add_argument('-log_file', help='log file name', default='log.txt')
+
+    cfg = parser.parse_args()
+    return cfg
+
+
 def build_optimizer(cfg, img):
     '''
     Input:
@@ -67,33 +109,13 @@ def build_optimizer(cfg, img):
     
     return optimizer
 
-def save_img_plt(img, path, gray=False):
-    '''
-    Input : 1 * 1 * H * W / 1 * 3 * H * W Tensor 
-    '''
-    #print('===>save image')
-    #print(path)
-    #print('img shape', img.shape)
 
-    img = img.cpu().numpy()
-    img = img * 255 
-    if not gray:
-        img = np.dstack([img[0,0,:,:], img[0,1,:,:], img[0,2,:,:]])
-    else:
-        img = img.squeeze((0,1))
-    plt.figure()
-    if not gray:
-        plt.imshow(img)
-    else:
-        plt.imshow(img ,cmap='Greys_r')
-    plt.colorbar()
-    plt.savefig(path)
-    plt.close()
-
-
-def mask_preprocess(mask_file, out_shape, dtype, device):
+def mask_preprocess(mask_file, out_shape):
     '''
-    Return : 1 * 1 * H * W [0. - 1.] Tensor for mask 
+    Return : 
+        1 * 1 * H * W [0. - 1.] Tensor for mask 
+    Notice : 
+        NO CONVERSINO OF TYPE / DEVICE IS DONE IN THIS FUNCTION 
     '''
     mask = Image.open(mask_file).convert('L')
 
@@ -106,18 +128,18 @@ def mask_preprocess(mask_file, out_shape, dtype, device):
     ])
 
     mask = transform(mask)
-    mask = mask.to(device)
-    mask = mask.type(dtype)
     mask[mask != 0] = 1
     mask = mask.unsqueeze(0)
 
     return mask 
 
 
-def img_preprocess(img_file, out_shape, dtype, device):
+def img_preprocess(img_file, out_shape, norm=True):
     '''
-    Return : 1 * 3 * H * W [0. - 255.] Tensor for image  
-    Tensor already convert to dtype, and pass to device 
+    Return : 
+        1 * 3 * H * W [0. - 255.] Tensor for image  
+    Notice:
+        NO CONVERSINO OF TYPE / DEVICE IS DONE IN THIS FUNCTION 
     '''
     img = Image.open(img_file).convert('RGB')
 
@@ -128,94 +150,52 @@ def img_preprocess(img_file, out_shape, dtype, device):
         transforms.Resize(out_shape),
         transforms.ToTensor(),
     ])
+    rgb2bgr = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
     normalize = transforms.Normalize(mean=[103.939, 116.779, 123.68], std=[1,1,1])
 
-    img = transform(img)
-    #img = normalize(img*256)
-    img = img * 256 
-    img = img.to(device)
-    img = img.type(dtype)
+    img = rgb2bgr(transform(img) * 256)
+    if norm:
+        img = normalize(img)
     img = img.unsqueeze(0)
 
     return img # [0. - 255.]
 
 
-def img_deprocess(img_tensor):
+def img_deprocess(img_tensor, norm=True):
     '''
     Input : 
-        img_tensor : 1 * 3 * H * W Tensor represent the updated image [0.-255.]
+        img_tensor : 1 * 3 * H * W [0.-255.] Tensor represent the updated image 
     Notice : 
         remember to clone() the value when given as input to this function 
     Return : 
         PIL.Image 
     '''
     de_normalize = transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])
-    #img_tensor = de_normalize(img_tensor.squeeze(0).cpu()) / 256
-    img_tensor = img_tensor.squeeze(0).cpu() / 256
-    #img_tensor.clamp_(0, 1)
-    # import pdb; pdb.set_trace()
+    bgr2rgb = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
+
+    img_tensor = img_tensor.squeeze(0).cpu()
+    if norm:
+        img_tensor = de_normalize(img_tensor)
+    img_tensor = bgr2rgb(img_tensor / 256)
+    img_tensor.clamp_(0, 1)
+
     img = transforms.ToPILImage()(img_tensor)
 
     return img 
 
-def new_img_preprocess(image_name, image_size):
-    image = Image.open(image_name).convert('RGB')
-    if type(image_size) is not tuple:
-        image_size = tuple([int((float(image_size) / max(image.size))*x) for x in (image.height, image.width)])
-    Loader = transforms.Compose([transforms.Resize(image_size), transforms.ToTensor()])
-    rgb2bgr = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
-    Normalize = transforms.Compose([transforms.Normalize(mean=[103.939, 116.779, 123.68], std=[1,1,1])])
-    tensor = Normalize(rgb2bgr(Loader(image) * 256)).unsqueeze(0)
-    return tensor
-
-def new_img_deprocess(output_tensor):
-    Normalize = transforms.Compose([transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])])
-    bgr2rgb = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
-    output_tensor = bgr2rgb(Normalize(output_tensor.squeeze(0).cpu())) / 256
-    output_tensor.clamp_(0, 1)
-    Image2PIL = transforms.ToPILImage()
-    image = Image2PIL(output_tensor.cpu())
-    return image
-
-def new_preprocess(cfg, dtype, device):
-    '''
-    content image : not in dtype, not in device 
-    '''
-    content_img = new_img_preprocess(cfg.native_image, cfg.output_img_size).type(dtype) # 1 * 3 * H * W [0.-255.]
-    style_img = new_img_preprocess(cfg.style_image, cfg.output_img_size).type(dtype) # 1 * 3 * H * W [0.-255.]
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device).type(dtype) # 1 * 1 * H * W [0/1]
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device).type(dtype) # 1 * 1 * H * W [0/1]
-
-    return content_img, style_img, tight_mask, loss_mask
 
 def preprocess(cfg, dtype, device):
-
-    # Get input image and preprocess
-    content_img = img_preprocess(cfg.native_image, cfg.output_img_size, dtype, device) # 1 * 3 * H * W [0.-255.]
-    style_img = img_preprocess(cfg.style_image, cfg.output_img_size, dtype, device) # 1 * 3 * H * W [0.-255.]
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device) # 1 * 1 * H * W [0/1]
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device) # 1 * 1 * H * W [0/1]
-
-    content_img = nn.Parameter(content_img)
-    content_img.requires_grad = True
+    '''
+    Return : 
+        img : 1 * 3 * H * W , Tensor, (to(device), .type(dtype))
+        mask : 1 * 1 * H * W, Tensor, (to(device), .type(dtype))
+    '''
+    content_img = img_preprocess(cfg.native_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    style_img = img_preprocess(cfg.style_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
+    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
 
     return content_img, style_img, tight_mask, loss_mask
-
-
-def display_masked_region(native_img, style_img, loss_mask):
-    '''
-    Input : 
-        1 * 3 * H * W 
-        1 * 1 * H * W 
-    '''   
-    native_img_masked = native_img * loss_mask.expand_as(native_img)
-    styled_img_masked = style_img * loss_mask.expand_as(style_img)
-
-    native_img_masked = img_deprocess(native_img_masked)
-    styled_img_masked = img_deprocess(styled_img_masked)
-
-    native_img_masked.save('./current_native_img_masked.png')
-    styled_img_masked.save('./current_style_img_masked.png')
 
 
 def conv2d_same_padding(input, filter, stride=1):

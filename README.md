@@ -107,7 +107,12 @@ python3 main.py -lr 1e-1 -p1_n_iters 2000 -p2_n_iters 1000
 For more information on how to specify training process, check `main.py -> get_args()` 
 
 
-## Auxilary Network Dataset 
+
+ $L_{tv} = w_t \times \left(\sum_{c=1}^3\sum_{i=1}^{H-1}\sum_{j=1}^{W} (x_{i+1,j,c} - x_{i,j,c})^2 + \sum_{c=1}^3\sum_{i=1}^{H}\sum_{j=1}^{W - 1} (x_{i,j+1,c} - x_{i,j,c})^2\right)$
+
+
+
+## Auxilary Network Dataset
 
 Some dataset have been found that might work for the auxilary network (network that pick the weight of loss)
 

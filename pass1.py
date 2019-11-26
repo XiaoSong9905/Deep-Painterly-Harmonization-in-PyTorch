@@ -23,42 +23,6 @@ from utils import *
 if not os.path.exists('output'):
     os.makedirs('output')
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    # Input Output
-    parser.add_argument("-style_image", help="./path/file to style image", default='data/0_target.jpg')
-    parser.add_argument("-native_image", help="./path/file to simple stich image", default='data/0_naive.jpg')
-    parser.add_argument("-tight_mask", help="./path/file to tight mask", default='data/0_c_mask.jpg')
-    parser.add_argument("-dilated_mask", help="./path/file to dilated(loss) mask", default='data/0_c_mask_dilated.jpg')
-    parser.add_argument("-output_img", help="./path/file for output image", default='output/0_pass1_out.png')
-    parser.add_argument("-output_img_size", help="Max side(H/W) for output image, power of 2 is recommended", type=int,
-                        default=512)
-
-    # Training Parameter
-    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam')
-    parser.add_argument("-lr", type=float, default=1e0)
-    parser.add_argument("-n_iter", type=int, default=1000)
-    parser.add_argument("-print_interval", type=int, default=50)
-    parser.add_argument("-save_img_interval", type=int, default=100)
-    parser.add_argument("-log_interval", type=int, default=50)
-    parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
-
-    # Model Parameter
-    parser.add_argument("-content_layers", help="layers for content", default='relu4_2')
-    #parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1')
-    parser.add_argument("-style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1')
-    parser.add_argument("-content_weight", type=float, default=5e0)
-    parser.add_argument("-style_weight", type=float, default=1e2) 
-    parser.add_argument("-tv_weight", type=float, default=1e-3)
-    parser.add_argument("-init", choices=['random', 'image'], default='image')
-    parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default=None)
-    parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')
-    parser.add_argument("-match_patch_size", type=int, default=3)
-
-    cfg = parser.parse_args()
-    return cfg
-
-
 def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_loss_list, style_loss_list, tv_loss_list, net):
     print('\n===> Start Updating Image')
     start_time = time.time()
@@ -69,7 +33,6 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     
     img = content_img.clone()
     img = nn.Parameter(img)
-    # import pdb; pdb.set_trace()
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
@@ -93,7 +56,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
             else:
                 filename = str(output_filename) + "_iter_{:06d}".format(i_iter) + str(file_extension)
 
-            img_deprocessed = new_img_deprocess(img.clone())
+            img_deprocessed = img_deprocess(img.clone())
             img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer
@@ -116,16 +79,10 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
                 tv_loss += i.loss.to(device)
 
         total_loss = s_loss + c_loss + tv_loss # loss value is already weighted 
-
-        # import pdb; pdb.set_trace()
-
         total_loss.backward()
-
-        #import pdb; pdb.set_trace()
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
         img.grad = torch.mul(img.grad, loss_mask.expand_as(img))
-        #import pdb; pdb.set_trace()
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss)
         periodic_save(i_iter)
@@ -141,7 +98,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return content_img # 1 * 3 * H * W 
+    return img # 1 * 3 * H * W 
 
 
 def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
@@ -190,17 +147,21 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         # Add Loss layer 
         if layer_list[i] in content_layers:
             print('Add Content Loss at Position {}'.format(str(len(net))))
-            content_layer_loss = ContentLoss(cfg.content_weight, mask)
+
+            if cfg.mask_on == 'off':
+                mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
+
+            content_layer_loss = ContentLoss(weight=cfg.content_weight, mask=mask)
             net.add_module(str(len(net)), content_layer_loss)
             content_loss_list.append(content_layer_loss)
 
         if layer_list[i] in style_layers:
             print('Add Style Loss at Position {}'.format(str(len(net))))
-            # TODO style loss need more operation 
-            # Match operation should be done at this stage, future forward backward only do the update 
-            # See neural_gram.lua line 120 - 136 
-            style_layer_loss = StyleLoss(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
-            #style_layer_loss = StyleLoss(cfg.style_weight)
+
+            if cfg.mask_on == 'off':
+                mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
+
+            style_layer_loss = StyleLossPass1(weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 
@@ -212,7 +173,6 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
 
     print(net)
 
-    # import pdb; pdb.set_trace()
     print('\n===> Start Capture Content Image Feature Map')
     for i in content_loss_list: # For content loss 
         i.mode = 'capture'
@@ -227,7 +187,6 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'capture_style'
-    #    i.mode = 'capture'
     net(style_img)
 
     time_elapsed = time.time() - start_time
@@ -240,33 +199,28 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
     for i in style_loss_list:
         i.mode = 'loss'
 
-    # Set image to be gradient updatable 
-    #assert (content_img.requires_grad == True)
-
     return content_loss_list, style_loss_list, tv_loss_list, net
 
 
 def main():
-    # Setup Log 
-    # orig_stdout = init_log()
-
     # Initial Config 
     cfg = get_args()
-    dtype, device = setup(cfg)
-    content_img, style_img, tight_mask, loss_mask = new_preprocess(cfg, dtype, device)
 
-    print('## content shape', content_img.shape)
+    # Setup Log 
+    orig_stdout = init_log(cfg)
+
+    # Initial Config 
+    dtype, device = setup(cfg)
+    content_img, style_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
     content_loss_list, style_loss_list, tv_loss_list, net = build_net(cfg, device, content_img, style_img, tight_mask, loss_mask)
 
     # Training 
     inter_img = train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_loss_list, style_loss_list, tv_loss_list, net)
-
-    inter_img_pil = img_deprocess(inter_img)
-    inter_img_pil.save('final.png')
+    
     # End Log 
-    # end_log(orig_stdout)
+    end_log(orig_stdout)
 
 
 if __name__ == '__main__':

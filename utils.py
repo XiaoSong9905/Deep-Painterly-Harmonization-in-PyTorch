@@ -191,9 +191,10 @@ def preprocess(cfg, dtype, device):
         mask : 1 * 1 * H * W, Tensor, (to(device), .type(dtype))
     '''
     content_img = img_preprocess(cfg.native_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
-    style_img = img_preprocess(cfg.style_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
-    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
-    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
+    img_size = (content_img.shape[2], content_img.shape[3]) 
+    style_img = img_preprocess(cfg.style_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    tight_mask = mask_preprocess(cfg.tight_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
+    loss_mask = mask_preprocess(cfg.dilated_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
 
     return content_img, style_img, tight_mask, loss_mask
 

@@ -103,26 +103,6 @@ class TVLoss(nn.Module):
         return input
 
 
-class ContentLossSave(nn.Module):
-
-    def __init__(self, strength, mask):
-        super(ContentLoss, self).__init__()
-        self.strength = strength
-        self.crit = nn.MSELoss()
-        self.mode = 'None'
-        # # # # import pdb; pdb.set_trace()
-
-    def forward(self, input):
-        if self.mode == 'loss':
-            # # # import pdb; pdb.set_trace()
-            self.loss = self.crit(input, self.target) * self.strength
-        elif self.mode == 'capture':
-            ## # # # import pdb; pdb.set_trace()
-            self.target = input.detach()
-            # # # import pdb; pdb.set_trace()
-            print('ContentLoss forward(), self.target', self.target.shape)
-        return input
-
 class ContentLoss(nn.Module):
     def __init__(self, content_weight, mask):
         super(ContentLoss, self).__init__()
@@ -150,16 +130,16 @@ class ContentLoss(nn.Module):
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
 
-            #def backward_variable_gradient_mask_hook_fn(grad):
+            def backward_variable_gradient_mask_hook_fn(grad):
             #    '''
             #    Functionality : 
             #        Return Gradient only over masked region
             #    Notice : 
             #        Variable hook is used in this case, Module hook is not supported for `complex moule` 
             #    '''
-            #    return torch.mul(grad, self.mask)
+                return torch.mul(grad, self.mask)
 
-            #input.register_hook(backward_variable_gradient_mask_hook_fn)
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 
@@ -254,7 +234,7 @@ class StyleLoss(nn.Module):
 
             # Compute Match 
             #correspond_fm, correspond_idx  = self.match_fm(style_fm, self.content_fm)
-            correspond_fm = style_fm
+            correspond_fm, _ = self.match_fm(self.content_fm, style_fm)
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 
@@ -275,16 +255,16 @@ class StyleLoss(nn.Module):
             #self.G = self.G / torch.sum(self.mask)
             #self.loss = self.critertain(self.G, self.target) * self.weight
 
-            #def backward_variable_gradient_mask_hook_fn(grad):
+            def backward_variable_gradient_mask_hook_fn(grad):
             #    '''
             #    Functionality : 
             #        Return Gradient only over masked region
             #    Notice : 
             #        Variable hook is used in this case, Module hook is not supported for `complex moule` 
             #    '''
-            #    return torch.mul(grad, self.mask)
+                return torch.mul(grad, self.mask)
 
-            #input.register_hook(backward_variable_gradient_mask_hook_fn)
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

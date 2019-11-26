@@ -46,19 +46,23 @@ def build_backbone(cfg):
         donwload_weight = False
 
     if cfg.model == 'vgg16':
-        net, layer_list = models.vgg16(pretrained=donwload_weight).features, vgg16_dict
+        net, layer_list = models.vgg16(pretrained=False), vgg16_dict
     elif cfg.model == 'vgg19':
-        net, layer_list = models.vgg19(pretrained=donwload_weight).features, vgg19_dict
+        net, layer_list = models.vgg19(pretrained=False), vgg19_dict
     else:
         return None
 
     # User Specific Weight 
     if user_pretrained_dict is not None:
-        net_state_dict = net.state_dict()
-        user_pretrained_dict = {k: v for k, v in user_pretrained_dict.items() if k in net_state_dict}
-        net_state_dict.update(user_pretrained_dict)
-        net.load_state_dict(net_state_dict)
+        print('Load User Weight')
+        # # # import pdb; pdb.set_trace()
+        #net_state_dict = net.state_dict()
+        #user_pretrained_dict = {k: v for k, v in user_pretrained_dict.items() if k in net_state_dict}
+        #net_state_dict.update(user_pretrained_dict)
+        #net.load_state_dict(net_state_dict)
+        net.load_state_dict(torch.load(cfg.model_file))
 
+    net = net.features
     # Freeze Parameter, only update img not net parameter 
     # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
     net = net.eval()
@@ -75,6 +79,7 @@ class TVLoss(nn.Module):
     def __init__(self, tv_weight):
         super(TVLoss, self).__init__()
         self.weight = tv_weight
+        # # # # import pdb; pdb.set_trace()
 
     def forward(self, input):
         '''
@@ -98,6 +103,26 @@ class TVLoss(nn.Module):
         return input
 
 
+class ContentLossSave(nn.Module):
+
+    def __init__(self, strength, mask):
+        super(ContentLoss, self).__init__()
+        self.strength = strength
+        self.crit = nn.MSELoss()
+        self.mode = 'None'
+        # # # # import pdb; pdb.set_trace()
+
+    def forward(self, input):
+        if self.mode == 'loss':
+            # # # import pdb; pdb.set_trace()
+            self.loss = self.crit(input, self.target) * self.strength
+        elif self.mode == 'capture':
+            ## # # # import pdb; pdb.set_trace()
+            self.target = input.detach()
+            # # # import pdb; pdb.set_trace()
+            print('ContentLoss forward(), self.target', self.target.shape)
+        return input
+
 class ContentLoss(nn.Module):
     def __init__(self, content_weight, mask):
         super(ContentLoss, self).__init__()
@@ -105,6 +130,7 @@ class ContentLoss(nn.Module):
         self.criterian = nn.MSELoss()
         self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
+        # # # # import pdb; pdb.set_trace()
 
     def forward(self, input):
         '''
@@ -119,6 +145,7 @@ class ContentLoss(nn.Module):
 
             # Update Mask Size after feature map is captured 
             self.mask = self.mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
+            # import pdb; pdb.set_trace()
 
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
@@ -165,8 +192,29 @@ class GramMatrix(nn.Module):
         x_flat = input.view(C, H * W)
         return torch.mm(x_flat, x_flat.t())
 
-
+# Define an nn Module to compute style loss
 class StyleLossPass1(nn.Module):
+
+    def __init__(self, weight):
+        super(StyleLoss, self).__init__()
+        self.weight = weight
+        self.gram = GramMatrix()
+        self.crit = nn.MSELoss()
+        self.mode = 'None'
+
+    def forward(self, input):
+        self.G = self.gram(input)
+        self.G = self.G.div(input.nelement())
+        if self.mode == 'capture':
+            # # # import pdb; pdb.set_trace()
+            self.target = self.G.detach()
+        elif self.mode == 'loss':
+            # # # import pdb; pdb.set_trace()
+            self.loss = self.weight * self.crit(self.G, self.target)
+        return input
+
+
+class StyleLoss(nn.Module):
     def __init__(self, style_weight, mask, match_patch_size, stride=1, device='cpu'):
         super().__init__()
         self.weight = style_weight
@@ -178,6 +226,7 @@ class StyleLossPass1(nn.Module):
         self.patch_size = match_patch_size
         self.stride = stride
         self.device = device 
+        # # # # import pdb; pdb.set_trace()
 
     def forward(self, input):
         '''
@@ -209,7 +258,8 @@ class StyleLossPass1(nn.Module):
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 
-            self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
+            #self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
+            self.G = self.gram(correspond_fm) / correspond_fm.nelement()
             self.target = self.G.detach()
             print('StyleLossPass1 compute style gram matrix')
 

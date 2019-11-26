@@ -158,6 +158,36 @@ def img_deprocess(img_tensor):
 
     return img 
 
+def new_img_preprocess(image_name, image_size):
+    image = Image.open(image_name).convert('RGB')
+    if type(image_size) is not tuple:
+        image_size = tuple([int((float(image_size) / max(image.size))*x) for x in (image.height, image.width)])
+    Loader = transforms.Compose([transforms.Resize(image_size), transforms.ToTensor()])
+    rgb2bgr = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
+    Normalize = transforms.Compose([transforms.Normalize(mean=[103.939, 116.779, 123.68], std=[1,1,1])])
+    tensor = Normalize(rgb2bgr(Loader(image) * 256)).unsqueeze(0)
+    return tensor
+
+def new_img_deprocess(output_tensor):
+    Normalize = transforms.Compose([transforms.Normalize(mean=[-103.939, -116.779, -123.68], std=[1,1,1])])
+    bgr2rgb = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
+    output_tensor = bgr2rgb(Normalize(output_tensor.squeeze(0).cpu())) / 256
+    output_tensor.clamp_(0, 1)
+    Image2PIL = transforms.ToPILImage()
+    image = Image2PIL(output_tensor.cpu())
+    return image
+
+def new_preprocess(cfg, dtype, device):
+    '''
+    content image : not in dtype, not in device 
+    '''
+    content_img = new_img_preprocess(cfg.native_image, cfg.output_img_size).type(dtype) # 1 * 3 * H * W [0.-255.]
+    style_img = new_img_preprocess(cfg.style_image, cfg.output_img_size).type(dtype) # 1 * 3 * H * W [0.-255.]
+    tight_mask = mask_preprocess(cfg.tight_mask, cfg.output_img_size, dtype, device).type(dtype) # 1 * 1 * H * W [0/1]
+    loss_mask = mask_preprocess(cfg.dilated_mask, cfg.output_img_size, dtype, device).type(dtype) # 1 * 1 * H * W [0/1]
+
+    return content_img, style_img, tight_mask, loss_mask
+
 def preprocess(cfg, dtype, device):
 
     # Get input image and preprocess

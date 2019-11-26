@@ -36,7 +36,7 @@ def get_args():
 
     # Training Parameter
     parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam')
-    parser.add_argument("-lr", type=float, default=1e-1)
+    parser.add_argument("-lr", type=float, default=1e0)
     parser.add_argument("-n_iter", type=int, default=1000)
     parser.add_argument("-print_interval", type=int, default=50)
     parser.add_argument("-save_img_interval", type=int, default=100)
@@ -44,7 +44,7 @@ def get_args():
     parser.add_argument("-gpu", help="Zero-indexed ID of the GPU to use; for CPU mode set -gpu = cpu", default='cpu')
 
     # Model Parameter
-    parser.add_argument("-content_layers", help="layers for content", default='relu4_1')
+    parser.add_argument("-content_layers", help="layers for content", default='relu4_2')
     #parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1')
     parser.add_argument("-style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1')
     parser.add_argument("-content_weight", type=float, default=5e0)
@@ -66,11 +66,18 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     net = net.to(device).eval()
     for param in net.parameters():
         param.requires_grad = False
-        
-    content_img = nn.Parameter(content_img)
+    
+    img = content_img.clone()
+    img = nn.Parameter(img)
+    # import pdb; pdb.set_trace()
 
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
+            for i, module in enumerate(content_loss_list):
+                print("  Content " + str(i+1) + " loss: " + str(module.loss.item()))
+            for i, module in enumerate(style_loss_list):
+                print("  Style " + str(i+1) + " loss: " + str(module.loss.item()))
+
             if type(tv_loss) != int:
                 tv_loss = tv_loss.item()
             print('Iteration {:06d} ; Content Loss {:.06f}; Style Loss {:.06f}; TV Loss {:.06f}; Total Loss {:.06f}'.format(
@@ -86,14 +93,14 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
             else:
                 filename = str(output_filename) + "_iter_{:06d}".format(i_iter) + str(file_extension)
 
-            img_deprocessed = img_deprocess(content_img.clone())
+            img_deprocessed = new_img_deprocess(img.clone())
             img_deprocessed.save(str(filename))
 
     # Build optimizer and run optimizer
     def closure():
 
         optimizer.zero_grad()
-        _ = net(content_img)
+        _ = net(img)
 
         c_loss = 0
         s_loss = 0
@@ -109,16 +116,23 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
                 tv_loss += i.loss.to(device)
 
         total_loss = s_loss + c_loss + tv_loss # loss value is already weighted 
+
+        # import pdb; pdb.set_trace()
+
         total_loss.backward()
 
+        #import pdb; pdb.set_trace()
 
         # After computing gradient w.r.t img, only update gradient on the masked region of img 
-        #content_img.grad = content_img.grad * loss_mask.expand_as(content_img)
+        img.grad = torch.mul(img.grad, loss_mask.expand_as(img))
+        #import pdb; pdb.set_trace()
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, total_loss)
         periodic_save(i_iter)
 
-    optimizer = build_optimizer(cfg, content_img)
+        return total_loss
+
+    optimizer = build_optimizer(cfg, img)
     i_iter = 0
     while i_iter <= cfg.n_iter:
         optimizer.step(closure)
@@ -176,7 +190,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         # Add Loss layer 
         if layer_list[i] in content_layers:
             print('Add Content Loss at Position {}'.format(str(len(net))))
-            content_layer_loss = ContentLoss(content_weight=cfg.content_weight, mask=mask)
+            content_layer_loss = ContentLoss(cfg.content_weight, mask)
             net.add_module(str(len(net)), content_layer_loss)
             content_loss_list.append(content_layer_loss)
 
@@ -185,7 +199,8 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
             # TODO style loss need more operation 
             # Match operation should be done at this stage, future forward backward only do the update 
             # See neural_gram.lua line 120 - 136 
-            style_layer_loss = StyleLossPass1(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
+            style_layer_loss = StyleLoss(style_weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
+            #style_layer_loss = StyleLoss(cfg.style_weight)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 
@@ -197,6 +212,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
 
     print(net)
 
+    # import pdb; pdb.set_trace()
     print('\n===> Start Capture Content Image Feature Map')
     for i in content_loss_list: # For content loss 
         i.mode = 'capture'
@@ -211,6 +227,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         i.mode = 'None'
     for i in style_loss_list:
         i.mode = 'capture_style'
+    #    i.mode = 'capture'
     net(style_img)
 
     time_elapsed = time.time() - start_time
@@ -224,7 +241,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
         i.mode = 'loss'
 
     # Set image to be gradient updatable 
-    assert (content_img.requires_grad == True)
+    #assert (content_img.requires_grad == True)
 
     return content_loss_list, style_loss_list, tv_loss_list, net
 
@@ -236,7 +253,9 @@ def main():
     # Initial Config 
     cfg = get_args()
     dtype, device = setup(cfg)
-    content_img, style_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
+    content_img, style_img, tight_mask, loss_mask = new_preprocess(cfg, dtype, device)
+
+    print('## content shape', content_img.shape)
 
     # Build Network 
     content_loss_list, style_loss_list, tv_loss_list, net = build_net(cfg, device, content_img, style_img, tight_mask, loss_mask)

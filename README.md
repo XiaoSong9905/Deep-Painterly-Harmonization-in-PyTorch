@@ -1,4 +1,4 @@
-# Project : Deep Painterly Harmonization in PyTorch 
+# Deep Painterly Harmonization in PyTorch
 
 > EECS 442 Final Project at University of Michigan, Ann Arbor
 > 
@@ -11,14 +11,17 @@ Pytorch implementation of paper "[Deep Painterly Harmonization](https://arxiv.or
 
 Official code written in Torch and lua can be found here [Github Link](https://github.com/luanfujun/deep-painterly-harmonization)
 
-
-This PyTorch implementation follow the structure of [Neural Style Pt Github Link](https://github.com/jcjohnson/neural-style) by Justin Johnson where the network is first build and feature map is captured after the architrcture is build. In the original code [Official Code Github Link](https://github.com/luanfujun/deep-painterly-harmonization), the feature map is captured during the build of architecture which cause waist of computation. Also, the loss in different layer back prop by simply adding them up and call `loss_total.backward()` where in the offitial code, a backward hook is build to pass the loss gradient (`function StyleLoss:updateGradInput`). Remember some of the implementation difference from the official code is that Torch do not come with autograd but PyTorch internally come with autograde
-
-
-**This Repo is still under active develop and have not yet finish**
+This PyTorch implementation follow the structure of [Neural Style Pt Github Link](https://github.com/jcjohnson/neural-style)
 
 
-## TODO 
+
+**Pass1 of update is finished, try it out**
+
+**Pass2 of update have not yet finish and still under active development**
+
+
+
+## TODO
 
 1. (dd, zw) StyleLossPass2 [DONE]
 
@@ -46,69 +49,131 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 13. (zw) Code formatting 
 
-14. 存下来pass1现在有的问题，然后在progress report上说找到了问题
+14. (sx) 存下来pass1现在有的问题，然后在progress report上说找到了问题 [DONE]
 
 15. pass2 rrelu5_1 是否有被用到， 把5_1的styel module删除掉
 
-16. pass1 参考源代码，更改match，解决产生noise的问题 (pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  )
+16. (sx) pass1 参考源代码，更改match，解决产生noise的问题 (pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  )  [DONE]
 
 17. pass2 参考源代码，解决模糊的问题， 可能和match相关
 
 18. 拆分pass1, pass2为两个文件
 
-19. optimizer 不一样
+19. (sx) optimizer 不一样  [DONE]
 
-20. pass1中是否有histogram loss / total variance loss
+20. (sx) pass1中是否有histogram loss / total variance loss  [DONE]
 
-21. 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的
+21. (sx) 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的  [DONE] 
 
-## Getting Started with the code 
+
+
+## Requirement
 
 * Dependency 
 
 ```shell
 torch >= 1.3.1 
 torhchvision >= 0.4.1 
+python >= 3.7
 ```
 
-* Run on local computer with default setting 
+
+
+## Useage
+
+### Download Model Weight
+
+```shell
+python3 models/download_models.py
+```
+
+
+
+### Understand Notebook
+
+Before getting started with the code, checkout `notebook/*` to understand some implementation detail 
+
+
+
+### Run Code
+
+* Run on Default Setting 
 
 By default
 
 1. output image is stored under `output` directory 
-2. output image shape is 64 
+2. output image shape is 512 
 3. `0_target.jpg`, `0_naive.jpg` is used 
 
-```python
-python3 main.py
+```shell
+python3 pass1.py
+
+python3 pass2.py
 ```
+
+
 
 * Run on GPU setting like google colab 
 
-```python
-python3 main.py -gpu 0
+```shell
+python3 pass1.py -gpu 0
+
+python3 pass2.py -gpu 0
 ```
+
+
 
 * Run with specified style and content image 
 
-```python
-python3 main.py -style_image ./data/1_target.jpg \
+```shell
+python3 pass1.py 
+        -style_image ./data/1_target.jpg \
         -native_image ./data/1_naive.jpg \
         -tight_mask data/1_c_mask.jpg \
         -dilated_mask data/1_c_mask_dilated.jpg
 ```
 
+
+
 * Run with specified iteration, lr, etc 
 
-```python
-python3 main.py -lr 1e-1 -p1_n_iters 2000 -p2_n_iters 1000 
+```shell
+python3 pass1.py -lr 1e-1 -p1_n_iters 2000 -p2_n_iters 1000 
 ```
 
-For more information on how to specify training process, check `main.py -> get_args()` 
 
 
+### Options
 
- $L_{tv} = w_t \times \left(\sum_{c=1}^3\sum_{i=1}^{H-1}\sum_{j=1}^{W} (x_{i+1,j,c} - x_{i,j,c})^2 + \sum_{c=1}^3\sum_{i=1}^{H}\sum_{j=1}^{W - 1} (x_{i,j+1,c} - x_{i,j,c})^2\right)$
+* `style_image`, `native_image`, `tight_mask`, `dilated_mask` : specify which style & content image to transfer 
+
+* `output_img` : name for output image, defualt `output/0_pass1_out.png`
+
+* `output_img_size` : output image size of the larger side 
+
+* `optim`, `lr`, `n_iter` : learning parameter choice 
+
+* `print_interval` : print loss interval 
+
+* `save_img_interval` : save intermediate image interval 
+
+* `gpu` : 'cpu' or '0'
+
+* `content_layers`, `style_layers` : specify content layer, style layer 
+
+* `content_weight`, `style_weight`, `tv_weight` : weight for each loss, all style loss share the same weight 
+
+* `model` : model choice, 'vgg16' / 'vgg19'
+
+* `model_file` : user specify weight for model, must match model choice 
+
+* `match_patch_size` : patch size for feature map matching, default 3 like paper 
+
+* `mask_on` : use mask or not, default mask on like paper, you can also choose mask off to compute mathing feature map for whole content image & compuet loss on whole content image 
+
+* `log_on` : use log or not, default log off 
+
+* `log_file` : file name to log 
 
 
 
@@ -121,4 +186,21 @@ Some dataset have been found that might work for the auxilary network (network t
 * [dataset download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart.zip)
 
 * [annotation download link](http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart_csv.zip)  (use the style data part)
+
+
+
+## Citation 
+
+If you find this code useful for your research, please cite:
+
+```shell
+@misc{DPH2018,
+  author = {Xiao Song, Ziyan Wang, Deyang Dai},
+  title = {Deep-Painterly-Harmonization-in-PyTorch},
+  year = {2018},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/XiaoSong9905/Deep-Painterly-Harmonization-in-PyTorch}},
+}
+```
 

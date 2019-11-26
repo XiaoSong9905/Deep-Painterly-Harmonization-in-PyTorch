@@ -36,32 +36,37 @@ vgg19_dict = [
 ]
 
 
-def build_backbone(cfg):
-    donwload_weight = True
-    user_pretrained_dict = None
 
-    # Build Model with user specific weight 
-    if cfg.model_file is not None:
-        user_pretrained_dict = torch.load(cfg.model_file)
-        donwload_weight = False
+def build_backbone(cfg):
+    '''
+    Notice : 
+        1. User must specify a model weight 
+        2. To use default model weight, run 'models/download_models.py' to download model 
+    '''
+    
+    assert(cfg.model_file is not None)
 
     if cfg.model == 'vgg16':
-        net, layer_list = models.vgg16(pretrained=donwload_weight).features, vgg16_dict
+        net, layer_list = models.vgg16(pretrained=False), vgg16_dict
     elif cfg.model == 'vgg19':
-        net, layer_list = models.vgg19(pretrained=donwload_weight).features, vgg19_dict
+        net, layer_list = models.vgg19(pretrained=False), vgg19_dict
     else:
-        return None
+        print('Model Not support, use vgg16 / vgg19')
+        exit(1)
 
-    # User Specific Weight 
-    if user_pretrained_dict is not None:
-        net_state_dict = net.state_dict()
-        user_pretrained_dict = {k: v for k, v in user_pretrained_dict.items() if k in net_state_dict}
-        net_state_dict.update(user_pretrained_dict)
-        net.load_state_dict(net_state_dict)
+    # When loading model, we asssume the model weight match the model architrcture 
+    print('Build {} with weight {}'.format(cfg.model, cfg.model_file))
+    user_state_dict = torch.load(cfg.model_file)
+    net_state_dict = net.state_dict()
+    user_state_dict = {k: v for k, v in user_state_dict.items() if k in net_state_dict}
+    net_state_dict.update(user_state_dict)
+    net.load_state_dict(net_state_dict)
 
-    # Freeze Parameter, only update img not net parameter 
-    # https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615/3 
+    # Only use the Convolutional part of the model 
+    net = net.features
+    
     net = net.eval()
+    
     for param in net.parameters():
         param.requires_grad = False
 
@@ -72,9 +77,9 @@ def build_backbone(cfg):
 
 
 class TVLoss(nn.Module):
-    def __init__(self, tv_weight):
+    def __init__(self, weight):
         super(TVLoss, self).__init__()
-        self.weight = tv_weight
+        self.weight = weight
 
     def forward(self, input):
         '''
@@ -99,9 +104,9 @@ class TVLoss(nn.Module):
 
 
 class ContentLoss(nn.Module):
-    def __init__(self, content_weight, mask):
+    def __init__(self, weight, mask):
         super(ContentLoss, self).__init__()
-        self.weight = content_weight  # content loss weight
+        self.weight = weight 
         self.criterian = nn.MSELoss()
         self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
@@ -109,9 +114,10 @@ class ContentLoss(nn.Module):
     def forward(self, input):
         '''
         Process:
-            1. before update image, `self.mode = 'capture'` will be set to capture content image feature map and save 
-            2. during update image, `self.mode = 'loss'` will be set to compute loss and pass `input` to the next module
+            1. before update image(Step 1), `self.mode = 'capture'` will be set to capture content image feature map and save 
+            2. during update image(Step 2), `self.mode = 'loss'` will be set to compute loss and pass `input` to the next module
         '''
+        # Step 1 : capture content image feature map 
         if self.mode == 'capture':
             # Capture Feature Map
             self.content_fm = input.detach()
@@ -120,6 +126,7 @@ class ContentLoss(nn.Module):
             # Update Mask Size after feature map is captured 
             self.mask = self.mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
 
+        # Step 2 : compute loss 
         elif self.mode == 'loss':
             self.loss = self.criterian(input, self.content_fm) * self.weight
 
@@ -139,7 +146,7 @@ class ContentLoss(nn.Module):
 
 class GramMatrix(nn.Module):
     '''
-    Take Reference from https://github.com/jcjohnson/neural-style/blob/master/neural_style.lua 
+    Take Reference from https://github.com/ProGamerGov/neural-style-pt 
     To understand how gram matrix work, checkout `understand Gram Matrix` notebook 
     '''
 
@@ -149,33 +156,33 @@ class GramMatrix(nn.Module):
     def forward(self, input):
         '''
         Input : 
-            input: 1 * C * H * W, represent feature map 
+            input: B * C * H * W, represent feature map 
         Output : 
-            output : 1 * (C * C), represent gram matrix 
+            output : B * (C * C), represent gram matrix 
         '''
-        #B, C, H, W = input.shape
-        #output = torch.zeros((B, C, C))
-        #
-        #for i in range(B):
-        #    fm_flat = input[i].view(C, H * W)
-        #    output[i] = torch.mm(fm_flat, fm_flat.t())
-        #
-        #return output
-        B, C, H, W = input.size()
-        x_flat = input.view(C, H * W)
-        return torch.mm(x_flat, x_flat.t())
+        B, C, H, W = input.shape
+        output = torch.zeros((B, C, C))
+        
+        for i in range(B):
+            fm_flat = input[i].view(C, H * W)
+            output[i] = torch.mm(fm_flat, fm_flat.t())
+        
+        return output
+        
+        #B, C, H, W = input.size()
+        #x_flat = input.view(C, H * W)
+        #return torch.mm(x_flat, x_flat.t())
 
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, style_weight, mask, match_patch_size, stride=1, device='cpu'):
+    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu'):
         super().__init__()
-        self.weight = style_weight
+        self.weight = weight
         self.critertain = nn.MSELoss()
         self.gram = GramMatrix()
         self.mask = mask.clone()
         self.mode = 'None'
-        self.loss = None
-        self.patch_size = match_patch_size
+        self.patch_size = match_patch_size # patch size for matching between feature map, in the original paper 3 is used
         self.stride = stride
         self.device = device 
 
@@ -204,12 +211,12 @@ class StyleLossPass1(nn.Module):
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match 
-            #correspond_fm, correspond_idx  = self.match_fm(style_fm, self.content_fm)
-            correspond_fm = style_fm
+            correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 
             self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
+            #self.G = self.gram(correspond_fm) / correspond_fm.nelement()
             self.target = self.G.detach()
             print('StyleLossPass1 compute style gram matrix')
 
@@ -218,6 +225,9 @@ class StyleLossPass1(nn.Module):
 
         # Step 3 : during updateing image 
         elif self.mode == 'loss':
+            #self.G = self.gram(input)
+            #self.G = self.G / input.nelement()
+            #self.loss = self.critertain(self.G, self.target) * self.weight
             self.G = self.gram(torch.mul(input, self.mask))
             self.G = self.G / torch.sum(self.mask)
             self.loss = self.critertain(self.G, self.target) * self.weight
@@ -338,8 +348,8 @@ class StyleLossPass2(StyleLossPass1):
     child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
     '''
 
-    def __init__(self, style_weight, layer_mask, match_patch_size, stride=1, device='cpu'):
-        super(StyleLossPass2, self).__init__(style_weight, layer_mask, match_patch_size, stride, device)
+    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu'):
+        super(StyleLossPass2, self).__init__(weight, mask, match_patch_size, stride, device)
         self.ref_corr = None
         # TODO
 

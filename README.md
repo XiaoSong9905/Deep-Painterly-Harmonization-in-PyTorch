@@ -108,7 +108,16 @@ By default
 ```shell
 python3 pass1.py
 
-python3 pass2.py
+python3 pass2.py -output_img output/0_pass2_out.png
+```
+
+
+
+* Run Pass2 Starting from Offitial Pass1 result 
+
+```shell
+python3 pass2.py -output_img output/0_pass2_out.png  \
+								 -native_image official_result/0_inter_res.jpg
 ```
 
 

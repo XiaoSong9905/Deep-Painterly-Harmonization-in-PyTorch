@@ -17,7 +17,7 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import sys
-from model_style import *
+from model import *
 from utils import *
 
 if not os.path.exists('output'):
@@ -101,7 +101,7 @@ def train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_lo
     return img # 1 * 3 * H * W 
 
 
-def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
+def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask, StyleLoss, ContentLoss, TVLoss):
     # Setup Network 
     content_layers = cfg.content_layers.split(',')
     style_layers = cfg.style_layers.split(',')
@@ -161,7 +161,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
             if cfg.mask_on == 'off':
                 mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
 
-            style_layer_loss = StyleLossPass1(weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
+            style_layer_loss = StyleLoss(weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 
@@ -173,7 +173,13 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
 
     print(net)
 
+    return content_loss_list, style_loss_list, tv_loss_list, net
+
+def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net):
+
     print('\n===> Start Capture Content Image Feature Map')
+    start_time = time.time()
+    
     for i in content_loss_list: # For content loss 
         i.mode = 'capture'
     for i in style_loss_list: # For match relation 
@@ -181,7 +187,6 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
     net(content_img)
 
     print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
-    start_time = time.time()
 
     for i in content_loss_list:
         i.mode = 'None'
@@ -199,7 +204,7 @@ def build_net(cfg, device, content_img, style_img, tight_mask, loss_mask):
     for i in style_loss_list:
         i.mode = 'loss'
 
-    return content_loss_list, style_loss_list, tv_loss_list, net
+    return None
 
 
 def main():
@@ -214,7 +219,10 @@ def main():
     content_img, style_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, net = build_net(cfg, device, content_img, style_img, tight_mask, loss_mask)
+    content_loss_list, style_loss_list, tv_loss_list, net = build_net(cfg, device, content_img, style_img, tight_mask, loss_mask, StyleLossPass1, ContentLoss, TVLoss)
+
+    # Capture FM & Compute Match 
+    capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net)
 
     # Training 
     inter_img = train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_loss_list, style_loss_list, tv_loss_list, net)

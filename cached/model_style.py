@@ -1,5 +1,5 @@
 # EECS 442 @ UMich Final Project 
-# No commercial Use Allowed 
+# No Commercial Use Allowed 
 
 import os
 import torch
@@ -79,7 +79,6 @@ class TVLoss(nn.Module):
     def __init__(self, weight):
         super(TVLoss, self).__init__()
         self.weight = weight
-        # # # # import pdb; pdb.set_trace()
 
     def forward(self, input):
         '''

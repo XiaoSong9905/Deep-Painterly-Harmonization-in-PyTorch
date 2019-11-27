@@ -65,7 +65,16 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 21. (sx) 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的  [DONE] 
 
+22. histogram loss in parss 2
 
+23. what's left to do : 如何解决noise， 一个段落
+
+我分析了他的代码，我的normalization和他的不一样，可能是match的方式有问题。
+还有乱七八糟的方法，例如softmax的方法，逼着IA说出东西，还要参考xxx的东西
+查看weight的分布
+network的weight
+
+分析一下noise的原因，说一下可能是什么
 
 ## Requirement
 

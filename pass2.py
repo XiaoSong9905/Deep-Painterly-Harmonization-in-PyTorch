@@ -11,7 +11,7 @@ from pass1 import train, build_net
 if not os.path.exists('output'):
     os.makedirs('output')
 
-def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net):
+def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net):
 
     print('\n===> Start Capture Content Image Feature Map')
     start_time = time.time()
@@ -19,14 +19,18 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, content_i
     print(len(content_loss_list), len(style_loss_list))
     for i in content_loss_list:
         i.mode = 'capture'
+    net(content_img)
+
+    for i in content_loss_list: # Reset 
+        i.mode = 'None' 
+
     for i in style_loss_list:
         i.mode = 'capture_content'
     net(content_img)
 
-    for i in content_loss_list:
+    for i in style_loss_list: # Reset
         i.mode = 'None'
-    for i in style_loss_list:
-        i.mode = 'None'
+
     print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
 
     print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
@@ -49,12 +53,18 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, content_i
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
+    for i in histogram_loss_list:
+        i.mode = 'None'
+        # TODO capture the information need by the histogram loss 
+
     # reset the model to loss mode for update
     for i in content_loss_list:
         i.mode = 'loss'
 
     for i in style_loss_list:
         i.mode = 'loss'
+
+        
 
     return None
 
@@ -68,16 +78,16 @@ def main():
 
     # Initial Config 
     dtype, device = setup(cfg)
-    content_img, style_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
+    content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, net = build_net(cfg, device, content_img, style_img, tight_mask, loss_mask, StyleLossPass2, ContentLoss, TVLoss)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss)
 
     # Capture FM & Compute Match 
-    capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net)
+    capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net)
 
     # Training 
-    final_img = train(cfg, device, content_img, style_img, loss_mask, tight_mask, content_loss_list, style_loss_list, tv_loss_list, net)
+    inter_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask)
     
     # End Log 
     end_log(orig_stdout)

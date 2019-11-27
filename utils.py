@@ -55,7 +55,8 @@ def get_args():
     parser = argparse.ArgumentParser()
     # Input Output
     parser.add_argument("-style_image", help="./path/file to style image", default='data/0_target.jpg')
-    parser.add_argument("-native_image", help="./path/file to simple stich image", default='data/0_naive.jpg')
+    parser.add_argument("-content_image", help="./path/file to simple stich image", default='data/0_naive.jpg')
+    parser.add_argument("-inter_image", help="./path/file to intermediate image", default='official_result/0_inter_res.jpg')
     parser.add_argument("-tight_mask", help="./path/file to tight mask", default='data/0_c_mask.jpg')
     parser.add_argument("-dilated_mask", help="./path/file to dilated(loss) mask", default='data/0_c_mask_dilated.jpg')
     parser.add_argument("-output_img", help="./path/file for output image", default='output/0_pass1_out.png')
@@ -74,9 +75,11 @@ def get_args():
     parser.add_argument("-content_layers", help="layers for content", default='relu4_2')
     parser.add_argument("-style_layers", help="layers for style", default='relu3_1,relu4_1,relu5_1') # Layer choice for Deep Paintely Harmonization 
     #parser.add_argument("-style_layers", help="layers for style", default='relu1_1,relu2_1,relu3_1,relu4_1,relu5_1') # Layer choice for A Neural Algorithm of Artistic Style by Leon A. Gatys
+    parser.add_argument("-histogram_layers", help="layers for histogram loss, only use for pass2", default='relu1_1,relu4_1') # Not used in pass1
     parser.add_argument("-content_weight", type=float, default=5e0)
     parser.add_argument("-style_weight", type=float, default=1e2) 
     parser.add_argument("-tv_weight", type=float, default=1e-3)
+    parser.add_argument("-histogram_weight", type=float, default=0) # For pass 2, commonly use '1e2'
     parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default='./models/vgg19-d01eb7cb.pth')
     parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')
     parser.add_argument("-match_patch_size", type=int, default=3)
@@ -190,13 +193,15 @@ def preprocess(cfg, dtype, device):
         img : 1 * 3 * H * W , Tensor, (to(device), .type(dtype))
         mask : 1 * 1 * H * W, Tensor, (to(device), .type(dtype))
     '''
-    content_img = img_preprocess(cfg.native_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    content_img = img_preprocess(cfg.content_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
     img_size = (content_img.shape[2], content_img.shape[3]) 
     style_img = img_preprocess(cfg.style_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    inter_img = img_preprocess(cfg.inter_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]s
     tight_mask = mask_preprocess(cfg.tight_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
     loss_mask = mask_preprocess(cfg.dilated_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
+    print('Output Image shape', (3, img_size[0], img_size[1]))
 
-    return content_img, style_img, tight_mask, loss_mask
+    return content_img, style_img, inter_img, tight_mask, loss_mask
 
 
 def conv2d_same_padding(input, filter, stride=1):

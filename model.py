@@ -174,6 +174,18 @@ class GramMatrix(nn.Module):
         #return torch.mm(x_flat, x_flat.t())
 
 
+class HistogramLoss(nn.Module):
+    def __init__(self, weight, mask):
+        super().__init__()
+        self.weight = weight
+        self.mask = mask
+        self.mode = 'None'
+
+    def forward(self, input):
+        # TODO : do something 
+
+        return input 
+
 class StyleLossPass1(nn.Module):
     def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu'):
         super().__init__()

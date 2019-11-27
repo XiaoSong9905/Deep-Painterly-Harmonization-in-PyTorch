@@ -2,7 +2,7 @@
 
 > EECS 442 Final Project at University of Michigan, Ann Arbor
 > 
-> Reimplementatino of paper `Deep Painterly Harmonization` 
+> Reimplementation of paper `Deep Painterly Harmonization` 
 
 
 

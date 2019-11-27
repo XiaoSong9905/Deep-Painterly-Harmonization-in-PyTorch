@@ -21,6 +21,11 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
     img = start_img.clone()
     img = nn.Parameter(start_img)
 
+    content_loss_his = []
+    style_loss_his = []
+    tv_loss_his = []
+    histogram_loss_his = []
+
     def periodic_print(i_iter, c_loss, s_loss, tv_loss, h_loss, total_loss):
         if i_iter % cfg.print_interval == 0:
             if cfg.tv_weight > 0:
@@ -41,7 +46,7 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
                 for i, module in enumerate(tv_loss_list):
                     print("  Total Variance " + str(i+1) + " loss: " + str(module.loss.item()))
 
-    def periodic_save(i_iter):
+    def periodic_save_img(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.n_iter)
         if flag:
             print('Iteration {:06d} Save Image'.format(i_iter))
@@ -53,6 +58,17 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
 
             img_deprocessed = img_deprocess(img.clone())
             img_deprocessed.save(str(filename))
+    
+    def periodic_save_loss(i_iter, c_loss, s_loss, tv_loss, h_loss):
+        if i_iter % 10 == 0:
+            if cfg.tv_weight > 0:
+                tv_loss = tv_loss.item()
+            if cfg.histogram_weight > 0:
+                h_loss = h_loss.item()
+            content_loss_his.append(c_loss.item())
+            style_loss_his.append(s_loss.item())
+            tv_loss_his.append(tv_loss)
+            histogram_loss_his.append(h_loss)
 
     # Build optimizer and run optimizer
     def closure():
@@ -84,7 +100,8 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
         img.grad = torch.mul(img.grad, mask.expand_as(img))
 
         periodic_print(i_iter, c_loss, s_loss, tv_loss, h_loss, total_loss)
-        periodic_save(i_iter)
+        periodic_save_img(i_iter)
+        periodic_save_loss(i_iter, c_loss, s_loss, tv_loss, h_loss)
 
         return total_loss
 
@@ -96,6 +113,13 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+    
+    # Plot History 
+    if cfg.tv_weight > 0:
+        tv_loss_his = None
+    if cfg.histogram_weight > 0:
+        histogram_loss_his = None
+    plt_plot_loss(content_loss_his, style_loss_his, tv_loss_his, histogram_loss_his)
 
     return img # 1 * 3 * H * W 
 

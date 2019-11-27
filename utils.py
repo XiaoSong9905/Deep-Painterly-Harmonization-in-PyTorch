@@ -239,3 +239,22 @@ def get_patch(padding_feature, pos_h, pos_w, patch_size=3):
     pos_h = int(pos_h)
     pos_w = int(pos_w)
     return padding_feature[:, :, pos_h : pos_h + patch_size, pos_w : pos_w + patch_size].clone()
+
+
+def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his=None, histogram_loss_his=None, name=''):
+    assert(len(style_loss_his) == len(content_loss_his))
+    x = np.arange(len(style_loss_his))
+    c_his = plt.plot(x, content_loss_his, label='Content Loss')
+    s_his = plt.plot(x, style_loss_his, label='Style Loss')
+    if tv_loss_his is not None:
+        assert(len(tv_loss_his) == len(style_loss_his))
+        tv_his = plt.plot(x, tv_loss_his, label='TV Loss')
+    if histogram_loss_his is not None:
+        assert(len(histogram_loss_his) == len(style_loss_his))
+        h_his = plt.plot(x, histogram_loss_his, label='Histogram Loss')
+    
+    plt.title('Loss History')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.legend(loc = "best")
+    plt.savefig(name+'loss_history.png')

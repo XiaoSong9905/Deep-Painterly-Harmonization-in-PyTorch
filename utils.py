@@ -140,10 +140,19 @@ def mask_preprocess(mask_file, out_shape):
 
 def img_preprocess(img_file, out_shape, norm=True):
     '''
+    Input:
+        img_file : file name to image 
+        output_shape : 
+        norm : if norm, normalize image to [0. - 255.]
+               if not norm, return image in range [0. - 1.] without normalization 
     Return : 
-        1 * 3 * H * W [0. - 255.] Tensor for image  
+        if norm : 1 * 3 * H * W [0. - 255.] Tensor for image  (used in this project)
+        if not norm : 1 * 3 * H * W [0. - 1.] Tensor for image  (used for further exploration)
     Notice:
         NO CONVERSINO OF TYPE / DEVICE IS DONE IN THIS FUNCTION 
+    Explain : 
+        random initialize network tend to produce value in range [0. - 1.] and hard to mimin image in range [0. - 255.].
+            thus output image in range [0. - 1.] if using random initialize network to output image (DIP)
     '''
     img = Image.open(img_file).convert('RGB')
 
@@ -157,9 +166,12 @@ def img_preprocess(img_file, out_shape, norm=True):
     rgb2bgr = transforms.Compose([transforms.Lambda(lambda x: x[torch.LongTensor([2,1,0])])])
     normalize = transforms.Normalize(mean=[103.939, 116.779, 123.68], std=[1,1,1])
 
-    img = rgb2bgr(transform(img) * 256)
     if norm:
+        img = rgb2bgr(transform(img) * 256)
         img = normalize(img)
+    else:
+        img = rgb2bgr(transform(img))
+
     img = img.unsqueeze(0)
 
     return img # [0. - 255.]
@@ -168,9 +180,14 @@ def img_preprocess(img_file, out_shape, norm=True):
 def img_deprocess(img_tensor, norm=True):
     '''
     Input : 
-        img_tensor : 1 * 3 * H * W [0.-255.] Tensor represent the updated image 
+        img_tensor : 
+            if norm 1 * 3 * H * W [0.-255.] Tensor represent the updated image 
+            if not norm 1 * 3 * H * W [0. - 1.] Tensor represent the updated image without normalization 
+        norm : 
+            if norm : resize to [0. - 1.]
+            if not norm : do nothing 
     Notice : 
-        remember to clone() the value when given as input to this function 
+        REMEMBER to clone() the value when given as input to this function 
     Return : 
         PIL.Image 
     '''
@@ -180,7 +197,9 @@ def img_deprocess(img_tensor, norm=True):
     img_tensor = img_tensor.squeeze(0).cpu()
     if norm:
         img_tensor = de_normalize(img_tensor)
-    img_tensor = bgr2rgb(img_tensor / 256)
+        img_tensor = bgr2rgb(img_tensor / 256)
+    else:
+        img_tensor = bgr2rgb(img_tensor)
     img_tensor.clamp_(0, 1)
 
     img = transforms.ToPILImage()(img_tensor)
@@ -188,15 +207,15 @@ def img_deprocess(img_tensor, norm=True):
     return img 
 
 
-def preprocess(cfg, dtype, device):
+def preprocess(cfg, dtype, device, norm=True):
     '''
     Return : 
         img : 1 * 3 * H * W , Tensor, (to(device), .type(dtype))
         mask : 1 * 1 * H * W, Tensor, (to(device), .type(dtype))
     '''
-    content_img = img_preprocess(cfg.content_image, cfg.output_img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    content_img = img_preprocess(cfg.content_image, cfg.output_img_size, norm=norm).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
     img_size = (content_img.shape[2], content_img.shape[3]) 
-    style_img = img_preprocess(cfg.style_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
+    style_img = img_preprocess(cfg.style_image, img_size, norm=norm).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]
     inter_img = img_preprocess(cfg.inter_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]s
     tight_mask = mask_preprocess(cfg.tight_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
     loss_mask = mask_preprocess(cfg.dilated_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
@@ -225,8 +244,6 @@ def conv2d_same_padding(input, filter, stride=1):
         input = F.pad(input, [0, int(cols_odd), 0, int(rows_odd)])
 
     return F.conv2d(input, filter, stride=stride, padding=(padding_rows // 2, padding_cols // 2))
-
-
 
 
 def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his=None, histogram_loss_his=None, name=''):

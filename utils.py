@@ -220,7 +220,7 @@ def preprocess(cfg, dtype, device, norm=True):
     inter_img = img_preprocess(cfg.inter_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]s
     tight_mask = mask_preprocess(cfg.tight_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
     loss_mask = mask_preprocess(cfg.dilated_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
-    print('Output Image shape', (3, img_size[0], img_size[1]))
+    #print('Output Image shape', (3, img_size[0], img_size[1]))
 
     return content_img, style_img, inter_img, tight_mask, loss_mask
 

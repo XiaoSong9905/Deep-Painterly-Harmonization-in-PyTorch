@@ -80,7 +80,7 @@ def get_args():
     parser.add_argument("-style_weight", type=float, default=1e2) 
     parser.add_argument("-tv_weight", type=float, default=1e-3)
     parser.add_argument("-histogram_weight", type=float, default=0) # For pass 2, commonly use '1e2'
-    parser.add_argument('-mse_loss_outside_mask_weight', type=float, default=1e2)
+    parser.add_argument('-mse_loss_outside_mask_weight', type=float, default=1)
     parser.add_argument('-mse_loss_within_mask_weight', type=float, default=1e2)
     parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default='./download_model_weight/vgg19-d01eb7cb.pth')
     parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')

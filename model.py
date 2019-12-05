@@ -235,8 +235,8 @@ class StyleLossPass1(nn.Module):
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match 
-            correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
-            #correspond_fm = style_fm
+            #correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
+            correspond_fm = style_fm
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 

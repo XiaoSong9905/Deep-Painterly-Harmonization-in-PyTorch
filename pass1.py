@@ -4,6 +4,7 @@
 import os
 import torch
 import torchvision
+import torchsummary as summary 
 from model import *
 from utils import *
 
@@ -207,7 +208,7 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
         param.requires_grad = False
 
     print(net)
-
+    
     return content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net
 
 def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net):

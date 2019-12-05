@@ -65,7 +65,7 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 21. (sx) 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的  [DONE] 
 
-22. histogram loss in parss 2
+22. (zw, dd) histogram loss in parss 2
 
 23. what's left to do : 如何解决noise， 一个段落
 

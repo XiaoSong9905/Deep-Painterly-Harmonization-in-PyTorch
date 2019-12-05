@@ -17,7 +17,11 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time
-from utils import get_patch
+
+import sys
+sys.path.append(".")
+
+from .utils import get_patch
 
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'pool1',

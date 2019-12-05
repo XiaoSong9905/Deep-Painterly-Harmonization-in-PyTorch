@@ -2,7 +2,7 @@ output/*.png
 output/*.jpg
 *.pth
 models/*.pth
-__pycache__/
+'__pycache__/'
 __pycache__*
 __pycache__/*
 .ipynb_checkpoints/

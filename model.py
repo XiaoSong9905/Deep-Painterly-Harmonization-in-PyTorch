@@ -18,11 +18,6 @@ import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import time
 
-import sys
-sys.path.append(".")
-
-from .utils import get_patch
-
 vgg16_dict = [
     'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'pool1',
     'conv2_1', 'relu2_1', 'conv2_2', 'relu2_2', 'pool2',
@@ -39,6 +34,19 @@ vgg19_dict = [
     'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'conv5_4', 'relu5_4', 'pool5'
 ]
 
+def get_patch(padding_feature, pos_h, pos_w, patch_size=3):
+    '''
+    return patch from feature at (pos_h, pos_w)
+
+    :param padding_feature: 1 * C * (H + pad) * (W + pad)
+    :param pos_h:
+    :param pos_w:
+    :param patch_size:
+    :return: patch: 1 * C * patch_size * patch_size
+    '''
+    pos_h = int(pos_h)
+    pos_w = int(pos_w)
+    return padding_feature[:, :, pos_h : pos_h + patch_size, pos_w : pos_w + patch_size].clone()
 
 
 def build_backbone(cfg):

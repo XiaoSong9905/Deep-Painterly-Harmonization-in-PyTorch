@@ -81,7 +81,7 @@ def get_args():
     parser.add_argument("-tv_weight", type=float, default=1e-3)
     parser.add_argument("-histogram_weight", type=float, default=0) # For pass 2, commonly use '1e2'
     parser.add_argument('-mse_loss_weight', type=float, default=1e2)
-    parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default='./models/vgg19-d01eb7cb.pth')
+    parser.add_argument("-model_file", help="path/file to saved model file, if not will auto download", default='./download_model_weight/vgg19-d01eb7cb.pth')
     parser.add_argument("-model", choices=['vgg16', 'vgg19'], default='vgg19')
     parser.add_argument("-match_patch_size", type=int, default=3)
 
@@ -227,19 +227,6 @@ def conv2d_same_padding(input, filter, stride=1):
     return F.conv2d(input, filter, stride=stride, padding=(padding_rows // 2, padding_cols // 2))
 
 
-def get_patch(padding_feature, pos_h, pos_w, patch_size=3):
-    '''
-    return patch from feature at (pos_h, pos_w)
-
-    :param padding_feature: 1 * C * (H + pad) * (W + pad)
-    :param pos_h:
-    :param pos_w:
-    :param patch_size:
-    :return: patch: 1 * C * patch_size * patch_size
-    '''
-    pos_h = int(pos_h)
-    pos_w = int(pos_w)
-    return padding_feature[:, :, pos_h : pos_h + patch_size, pos_w : pos_w + patch_size].clone()
 
 
 def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his=None, histogram_loss_his=None, name=''):

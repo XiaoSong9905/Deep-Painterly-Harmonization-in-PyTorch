@@ -26,6 +26,7 @@ for j in range(1, numGpus+1):
                        ' -gpu 0 ' \
 					   ' -output_img    output/' + str(idx) + '_inter_res.jpg'\
                        ' -output_img_size 710' \
+                       ' -n_iter 1300 ' \
 					   ' -print_interval 100 -save_img_interval 100 &&'
             cmd = cmd + part_cmd1
     

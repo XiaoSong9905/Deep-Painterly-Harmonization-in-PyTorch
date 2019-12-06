@@ -5,6 +5,10 @@ import os
 import torch
 import torchvision
 import torchsummary as summary 
+
+import sys
+sys.path.append(".")
+
 from model import *
 from utils import *
 
@@ -34,7 +38,7 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
             if cfg.histogram_weight > 0:
                 h_loss = h_loss.item()
             print('Iteration {:06d}; Total Content Loss {:.06f}; Total Style Loss {:.06f}; \
-                Total TV Loss {:.06f}; Total Histogram Loss {:.06f}'.format(i_iter, c_loss.item(), c_loss.item(), h_loss, tv_loss))
+Total TV Loss {:.06f}; Total Histogram Loss {:.06f}'.format(i_iter, c_loss.item(), c_loss.item(), h_loss, tv_loss))
 
             for i, module in enumerate(content_loss_list):
                 print("  Content " + str(i+1) + " loss: " + str(module.loss.item()))

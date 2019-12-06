@@ -22,7 +22,7 @@ cmd = ' python3 pass1.py '\
       ' -output_img_size 710' \
       ' -n_iter 1500 ' \
       ' -lr 1e1 ' \
-      ' -print_interval 100 -save_img_interval 10 &&'
+      ' -print_interval 100 -save_img_interval 10'
 
 print('#',cmd)
 os.system(cmd)

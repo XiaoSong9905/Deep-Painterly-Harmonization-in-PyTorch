@@ -37,9 +37,9 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
                 tv_loss = tv_loss.item()
             if cfg.histogram_weight > 0:
                 h_loss = h_loss.item()
-            print('Iteration {:06d}; Total Content Loss {:.06f}; Total Style Loss {:.06f}; \
-Total TV Loss {:.06f}; Total Histogram Loss {:.06f}'.format(i_iter, c_loss.item(), c_loss.item(), h_loss, tv_loss))
-
+            print('Iteration {:06d}; Total Loss {:.06f}; Content Loss {:.06f}; Style Loss {:.06f}; \
+TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(), s_loss.item(), tv_loss, h_loss))
+            '''
             for i, module in enumerate(content_loss_list):
                 print("  Content " + str(i+1) + " loss: " + str(module.loss.item()))
             for i, module in enumerate(style_loss_list):
@@ -50,6 +50,7 @@ Total TV Loss {:.06f}; Total Histogram Loss {:.06f}'.format(i_iter, c_loss.item(
             if cfg.tv_weight > 0:
                 for i, module in enumerate(tv_loss_list):
                     print("  Total Variance " + str(i+1) + " loss: " + str(module.loss.item()))
+            '''
 
     def periodic_save_img(i_iter):
         flag = (i_iter % cfg.save_img_interval == 0) or (i_iter == cfg.n_iter)

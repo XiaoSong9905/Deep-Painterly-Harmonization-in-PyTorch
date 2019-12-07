@@ -189,7 +189,7 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self, weight, mask):
+    def __init__(self, device, dtype, weight, mask):
         super().__init__()
         self.R = None
         self.S = None
@@ -198,6 +198,8 @@ class HistogramLoss(nn.Module):
         self.mode = 'None'
         self.loss = 0
         self.mask = mask
+        self.device = device, 
+        self.dtype = dtype 
 
     # TODO: consider merge into forward
     # def find_match(self, input, idx):

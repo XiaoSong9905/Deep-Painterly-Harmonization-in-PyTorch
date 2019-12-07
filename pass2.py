@@ -87,7 +87,7 @@ def main():
     capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net)
 
     # Training 
-    inter_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask)
+    final_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask)
     
     # End Log 
     end_log(orig_stdout)

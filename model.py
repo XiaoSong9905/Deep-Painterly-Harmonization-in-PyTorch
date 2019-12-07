@@ -552,7 +552,7 @@ class StyleLossPass2(StyleLossPass1):
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             if self.verbose:
-                print('StyleLossPass2 compute style gram matrix')
+                print('StyleLossPass2 compute style gram matrix (reference layer)')
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
@@ -566,7 +566,7 @@ class StyleLossPass2(StyleLossPass1):
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
             if self.verbose:
-                print('StyleLossPass2 compute style gram matrix')
+                print('StyleLossPass2 compute style gram matrix (others)')
 
         # Step 1 : Capture Content Feature Map
         elif self.mode == 'capture_content':

@@ -381,7 +381,7 @@ class StyleLossPass1(nn.Module):
 
         assert(correspond_fm.shape == content_fm.shape)
 
-        return correspond_fm, correspond_idx # 1 * C * H * W， 2 * H * W (first channel is x)
+        return correspond_fm, correspond_idx # 1 * C * H * W, 2 * H * W (first channel is x)
 
 
 class StyleLossPass2(StyleLossPass1):

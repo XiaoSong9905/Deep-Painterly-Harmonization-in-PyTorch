@@ -216,7 +216,7 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
     
     return content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net
 
-def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net):
+def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net, style_match=True):
 
     print('\n===> Start Capture Content Image Feature Map')
     start_time = time.time()
@@ -231,8 +231,12 @@ def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_i
 
     for i in content_loss_list:
         i.mode = 'None'
-    for i in style_loss_list:
-        i.mode = 'capture_style'
+    if style_match:
+        for i in style_loss_list:
+            i.mode = 'capture_style'
+    else:
+        for i in style_loss_list:
+            i.mode = 'None'
     net(style_img)
 
     time_elapsed = time.time() - start_time

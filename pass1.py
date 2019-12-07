@@ -208,7 +208,7 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss, 
             if cfg.mask_on == 'off':
                 mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
 
-            histogram_layer_loss = HistogramLoss() # TODO add code for initializaiton
+            histogram_layer_loss = HistogramLoss(weight=cfg.histogram_weight, mask=mask) # TODO add code for initializaiton
             net.add_module(str(len(net)), histogram_layer_loss)
             histogram_loss_list.append(histogram_layer_loss)
 

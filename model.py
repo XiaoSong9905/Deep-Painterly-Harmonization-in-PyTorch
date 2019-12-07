@@ -189,14 +189,15 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, weight, mask):
         super().__init__()
         self.R = None
         self.S = None
-        self.weight = 0.5
+        self.weight = weight
         self.nbins = 256
         self.mode = 'None'
         self.loss = 0
+        self.mask = mask
 
     # TODO: consider merge into forward
     # def find_match(self, input, idx):
@@ -322,16 +323,30 @@ class HistogramLoss(nn.Module):
     def forward(self, input):
         if self.mode == 'capture_style':
             self.S = input.clone()
+            print('His Loss Capture Style Image Feature Map')
 
         elif self.mode == 'capture_inter':
             # TODO: calulate histmatch(content, input), then calculate R
             R = self.hist_match(input, self.S)
             self.R = torch.tensor(R).to(input.dtype, input.device)
+            print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':
             self.loss = self.weight * torch.sum((input - self.R) ** 2)
             self.loss = torch.Tensor(self.loss).to(input.dtype, input.device)
-        
+            self.loss = self.loss / input.nelement()
+
+            def backward_variable_gradient_mask_hook_fn(grad):
+                '''
+                Functionality : 
+                    Return Gradient only over masked region
+                Notice : 
+                    Variable hook is used in this case, Module hook is not supported for `complex moule` 
+                '''
+                return torch.mul(grad, self.mask)
+
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
+
         return input
 
 

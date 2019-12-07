@@ -23,7 +23,7 @@ if pass12 == 1:
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_inter_res.jpg'\
         ' -output_img_size 710' \
-        ' -n_iter 1500 ' \
+        ' -n_iter 3000 ' \
         ' -lr 1e1 ' \
         ' -print_interval 100 -save_img_interval 10 '
 elif pass12 == 2:
@@ -35,8 +35,8 @@ elif pass12 == 2:
         ' -inter_image   output/' + str(idx) + '_inter_res.jpg' \
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
-        ' -output_img_size 40' \
-        ' -n_iter 1500 ' \
+        ' -output_img_size 710' \
+        ' -n_iter 3000 ' \
         ' -lr 1e1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \

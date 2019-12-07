@@ -11,7 +11,7 @@ idx = cfg.idx
 pass12 = cfg.p
 
 if not os.path.exists('output'):
-	os.mkdir('output')
+    os.mkdir('output')
 
 if pass12 == 1:
     cmd = ' python3 pass1.py '\

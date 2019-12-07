@@ -47,9 +47,9 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     tmp_ref_corr = None
     for idx, i in reversed(list(enumerate(style_loss_list))):  # TODO: change ref layer, and other layers
         if not i.mode == 'capture_style_ref':
-            i.set_ref_infor(tmp_ref_corr)
+            i.ref_infor = tmp_ref_corr
         else:
-            tmp_ref_corr = i.get_ref_infor()
+            tmp_ref_corr = i.ref_infor
             i.mode = 'None'
     net(style_img)
 

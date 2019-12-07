@@ -1,10 +1,5 @@
-output/*.png
-output/*.jpg
-*.pth
+__pycache__/
 models/*.pth
-'__pycache__/'
-__pycache__*
-__pycache__/*
 .ipynb_checkpoints/
-.ipynb_checkpoints/*
-debug.JPG
+.vscode
+loss_history.png

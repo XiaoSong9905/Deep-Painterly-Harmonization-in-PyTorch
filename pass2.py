@@ -11,12 +11,12 @@ from pass1 import train, build_net
 if not os.path.exists('output'):
     os.makedirs('output')
 
-def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net):
+def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net, verbose):
+    if verbose:
+        print('\n===> Start Capture Content Image Feature Map')
+        start_time = time.time()
+        print(len(content_loss_list), len(style_loss_list))
 
-    print('\n===> Start Capture Content Image Feature Map')
-    start_time = time.time()
-
-    print(len(content_loss_list), len(style_loss_list))
     for i in content_loss_list:
         i.mode = 'capture'
     net(content_img)
@@ -31,9 +31,10 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     for i in style_loss_list: # Reset
         i.mode = 'None'
 
-    print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
+    if verbose:
+        print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
+        print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
 
-    print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
     for idx, i in enumerate(style_loss_list):  # TODO: change ref layer, and other layers
         if idx == len(style_loss_list) - 1:  # last layer
             i.mode = 'capture_style_ref'
@@ -48,10 +49,11 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
         else:
             tmp_ref_corr = i.get_ref_infor()
             i.mode = 'None'
-    net(style_img)  # TODO: need purify since ref layer calculate twice
+    net(style_img)
 
-    time_elapsed = time.time() - start_time
-    print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+    if verbose:
+        time_elapsed = time.time() - start_time
+        print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
     for i in histogram_loss_list:
         i.mode = 'None'
@@ -81,13 +83,13 @@ def main():
     content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass2, ContentLoss, TVLoss, HistogramLoss)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass2, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
 
     # Capture FM & Compute Match 
-    capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net)
+    capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net, cfg.verbose)
 
     # Training 
-    final_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask)
+    final_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask, verbose=cfg.verbose)
     
     # End Log 
     end_log(orig_stdout)

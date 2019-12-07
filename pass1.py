@@ -15,9 +15,10 @@ from utils import *
 if not os.path.exists('output'):
     os.makedirs('output')
 
-def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img, mask):
-    print('\n===> Start Updating Image')
-    start_time = time.time()
+def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img, mask, verbose):
+    if verbose:
+        print('\n===> Start Updating Image')
+        start_time = time.time()
 
     net = net.to(device).eval()
     for param in net.parameters():
@@ -37,7 +38,8 @@ def train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, hi
                 tv_loss = tv_loss.item()
             if cfg.histogram_weight > 0:
                 h_loss = h_loss.item()
-            print('Iteration {:06d}; Total Loss {:.06f}; Content Loss {:.06f}; Style Loss {:.06f}; \
+            if verbose:
+                print('Iteration {:06d}; Total Loss {:.06f}; Content Loss {:.06f}; Style Loss {:.06f}; \
 TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(), s_loss.item(), tv_loss, h_loss))
             '''
             for i, module in enumerate(content_loss_list):
@@ -117,8 +119,9 @@ TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(
         optimizer.step(closure)
         i_iter += 1
 
-    time_elapsed = time.time() - start_time
-    print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+    if verbose:
+        time_elapsed = time.time() - start_time
+        print('@ Time Spend {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
     
     # Plot History 
     if cfg.tv_weight > 0:
@@ -130,7 +133,7 @@ TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(
     return img # 1 * 3 * H * W 
 
 
-def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
+def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss, verbose):
     # Setup Network 
     content_layers = cfg.content_layers.split(',')
     style_layers = cfg.style_layers.split(',')
@@ -143,13 +146,16 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
     # Build backbone 
     cnn, layer_list = build_backbone(cfg)
     cnn = copy.deepcopy(cnn)
-    print('\n===> Build Backbone Network with {}'.format(cfg.model))
-    print(cnn)
+
+    if verbose:
+        print('\n===> Build Backbone Network with {}'.format(cfg.model))
+        print(cnn)
 
     # Build net with loss model 
     net = nn.Sequential()
 
-    print('\n===> Build Network with Backbone & Loss Module')
+    if verbose:
+        print('\n===> Build Network with Backbone & Loss Module')
 
     if cfg.tv_weight > 0:
         print('Add TVLoss at Position {}'.format(str(len(net))))
@@ -191,7 +197,7 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
             if cfg.mask_on == 'off':
                 mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
 
-            style_layer_loss = StyleLoss(weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device)
+            style_layer_loss = StyleLoss(weight=cfg.style_weight, mask=mask, match_patch_size=cfg.match_patch_size, stride=1, device=device, verbose=verbose)
             net.add_module(str(len(net)), style_layer_loss)
             style_loss_list.append(style_layer_loss)
 
@@ -216,10 +222,11 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss):
     
     return content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net
 
-def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net):
+def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net, verbose):
 
-    print('\n===> Start Capture Content Image Feature Map')
-    start_time = time.time()
+    if verbose:
+        print('\n===> Start Capture Content Image Feature Map')
+        start_time = time.time()
     
     for i in content_loss_list: # For content loss 
         i.mode = 'capture'
@@ -227,7 +234,8 @@ def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_i
         i.mode = 'capture_content'
     net(content_img)
 
-    print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
+    if verbose:
+        print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
 
     for i in content_loss_list:
         i.mode = 'None'
@@ -235,8 +243,9 @@ def capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_i
         i.mode = 'capture_style'
     net(style_img)
 
-    time_elapsed = time.time() - start_time
-    print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
+    if verbose:
+        time_elapsed = time.time() - start_time
+        print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
     # reset the model to loss mode for update 
     for i in content_loss_list:
@@ -260,13 +269,13 @@ def main():
     content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
 
     # Capture FM & Compute Match 
-    capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net)
+    capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net, cfg.verbose)
 
     # Training 
-    inter_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=content_img, mask=loss_mask)
+    inter_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=content_img, mask=loss_mask, verbose=cfg.verbose)
     
     # End Log 
     end_log(orig_stdout)

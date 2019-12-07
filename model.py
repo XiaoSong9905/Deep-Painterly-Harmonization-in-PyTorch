@@ -323,7 +323,7 @@ class StyleLossPass1(nn.Module):
             to index into 4d Tensor [b, c, y, x] is used
         
         Output:
-            correspond_fm  1 * C * H * W，
+            correspond_fm  1 * C * H * W
             correspond_idx  2 * H * W first channel represent x index, second channel represent y index       
         '''
 

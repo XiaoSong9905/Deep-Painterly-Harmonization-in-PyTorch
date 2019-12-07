@@ -277,14 +277,60 @@ class HistogramLoss(nn.Module):
         self.masks[idx] = match
         return match, correspondence
 
+    def find_nearest_above(self, my_array, target):
+        diff = my_array - target
+        mask = np.ma.less_equal(diff, -1)
+        # We need to mask the negative differences
+        # since we are looking for values above
+        if np.all(mask):
+            c = np.abs(diff).argmin()
+            return c  # returns min index of the nearest if target is greater than any value
+        masked_diff = np.ma.masked_array(diff, mask)
+        return masked_diff.argmin()
+
+    def hist_match(self, A, B):
+        original = A.cpu().detach().numpy()
+        specified = B.cpu().detach().numpy()
+
+        oldshape = original.shape
+        original = original.ravel()
+        specified = specified.ravel()
+
+        # get the set of unique pixel values and their corresponding indices and counts
+        s_values, bin_idx, s_counts = np.unique(original, return_inverse=True, return_counts=True)
+        t_values, t_counts = np.unique(specified, return_counts=True)
+
+        # Calculate s_k for original image
+        s_quantiles = np.cumsum(s_counts).astype(np.float64)
+        s_quantiles /= s_quantiles[-1]
+
+        # Calculate s_k for specified image
+        t_quantiles = np.cumsum(t_counts).astype(np.float64)
+        t_quantiles /= t_quantiles[-1]
+
+        # Round the values
+        sour = np.around(s_quantiles * 255)
+        temp = np.around(t_quantiles * 255)
+
+        # Map the rounded values
+        b = []
+        for data in sour[:]:
+            b.append(self.find_nearest_above(temp, data))
+        b = np.array(b, dtype='uint8')
+
+        return b[bin_idx].reshape(oldshape)
+
+
     def forward(self, input):
         # input is style.
         # find hist match of R(content, style)
         # then sum up of (((content - match)**2)_C*H*W * weight)_N
         ########
         # TODO: calulate histmatch(content, input), then calculate R
+        R = self.hist_match(self.content_L, input)
+        R = torch.tensor(R).to(self.dtype, self.device)
         ########
-        loss = self.weight * torch.sum((self.content_L - self.R) ** 2)
+        loss = self.weight * torch.sum((self.content_L - R) ** 2)
         loss = torch.Tensor(loss).to(self.dtype, self.device)
         return loss
 

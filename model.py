@@ -192,6 +192,7 @@ class HistogramLoss(nn.Module):
     def __init__(self, content_L, weight=0.5):
         super().__init__()
         self.R = None
+        self.weight = weight
         self.nbins = 256
         self.stride = 1
         self.content_L = content_L # content layer

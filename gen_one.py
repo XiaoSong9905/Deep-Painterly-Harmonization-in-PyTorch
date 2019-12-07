@@ -24,7 +24,7 @@ if pass12 == 1:
         ' -output_img    output/' + str(idx) + '_inter_res.jpg'\
         ' -output_img_size 710' \
         ' -n_iter 3000 ' \
-        ' -lr 1e1 ' \
+        ' -lr 3e-1 ' \
         ' -print_interval 100 -save_img_interval 10 '
 elif pass12 == 2:
     cmd =' python3 pass2.py '\
@@ -37,7 +37,7 @@ elif pass12 == 2:
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size 710' \
         ' -n_iter 3000 ' \
-        ' -lr 1e1 ' \
+        ' -lr 3e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \

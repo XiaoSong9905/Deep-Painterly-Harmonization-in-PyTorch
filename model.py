@@ -330,7 +330,7 @@ class HistogramLoss(nn.Module):
             R = self.hist_match(input, self.S)
             import pdb; pdb.set_trace()
             
-            self.R = torch.tensor(R).to(input.dtype, input.device)
+            self.R = torch.from_numpy(R).to(input.dtype, input.device)
             print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':

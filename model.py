@@ -191,8 +191,10 @@ class HistogramLoss(nn.Module):
     def __init__(self):
         super().__init__()
         self.weight = [0.5, 0, 0, 0.5] # relu1_1 and relu4_1 has weight of 0.5
-        self.mask = [] # save matched result
+        self.masks = [] # save matched result
         self.mode = 'None'
+        self.nbins = 256
+        self.stride = 1
 
     def forward(self, input, target=None):
         # input is content, target is style.

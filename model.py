@@ -568,8 +568,8 @@ class StyleLossPass2(StyleLossPass1):
         for i in range(curr_h):
             for j in range(curr_w):
                 ref_idx = [(i + 0.5) // h_ratio, (j + 0.5) // w_ratio]
-                ref_idx[0] = int(max(min(ref_idx[0], ref_w - 1), 0))
-                ref_idx[1] = int(max(min(ref_idx[1], ref_h - 1), 0))
+                ref_idx[0] = int(max(min(ref_idx[0], ref_h - 1), 0))
+                ref_idx[1] = int(max(min(ref_idx[1], ref_w - 1), 0))
 
                 ref_mapping_idx = ref_corr[ref_idx[0], ref_idx[1]]
                 ref_mapping_idx = (ref_mapping_idx // ref_w, ref_mapping_idx % ref_w)

@@ -17,6 +17,7 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
         start_time = time.time()
         print(len(content_loss_list), len(style_loss_list))
 
+    # Content Loss
     for i in content_loss_list:
         i.mode = 'capture'
     net(content_img)
@@ -24,6 +25,7 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     for i in content_loss_list: # Reset 
         i.mode = 'None' 
 
+    # Style Loss 
     for i in style_loss_list:
         i.mode = 'capture_content'
     net(content_img)
@@ -55,6 +57,15 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
         time_elapsed = time.time() - start_time
         print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
+    # Histogram Loss 
+    for i in histogram_loss_list:
+        i.mode = 'capture_style'
+    net(style_img)
+
+    for i in histogram_loss_list:
+        i.mode = 'capture_inter'
+    net(inter_img)
+
     # reset the model to loss mode for update
     for i in content_loss_list:
         i.mode = 'loss'
@@ -62,7 +73,8 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     for i in style_loss_list:
         i.mode = 'loss'
 
-        
+    for i in histogram_loss_list:
+        i.mode = 'loss'
 
     return None
 

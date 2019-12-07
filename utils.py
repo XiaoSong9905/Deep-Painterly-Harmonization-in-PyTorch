@@ -92,7 +92,7 @@ def get_args():
     parser.add_argument("-mask_on", choices=['on', 'off'], default='on') # if 'off' is choose, no mask is use, match is computed between whole content image fm and style image fm
     parser.add_argument('-log_on', choices=['on', 'off'], default='off') # if 'on' is choose, redirect output to log file 
     parser.add_argument('-log_file', help='log file name', default='log.txt')
-    parser.add_argument('-verbose', help='print_information', action='store_true')
+    parser.add_argument('-verbose', help='print_information', action='store_true') # Print loss information during training or not
 
     cfg = parser.parse_args()
 

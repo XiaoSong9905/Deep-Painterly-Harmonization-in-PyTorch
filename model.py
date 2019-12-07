@@ -198,7 +198,7 @@ class HistogramLoss(nn.Module):
         self.mode = 'None'
         self.loss = 0
         self.mask = mask
-        self.device = device, 
+        self.device = device
         self.dtype = dtype 
 
     # TODO: consider merge into forward
@@ -324,14 +324,14 @@ class HistogramLoss(nn.Module):
 
     def forward(self, input):
         if self.mode == 'capture_style':
-            self.S = input.clone()
             print('His Loss Capture Style Image Feature Map')
+            self.S = input.clone()
 
         elif self.mode == 'capture_inter':
             # TODO: calulate histmatch(content, input), then calculate R
+            print('His Loss Capture Inter Image Feature Map & Compute Match')
             R = self.hist_match(input, self.S)
             self.R = torch.from_numpy(R).to(self.device).type(self.dtype)
-            print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':
             self.loss = self.weight * torch.sum((input - self.R) ** 2)

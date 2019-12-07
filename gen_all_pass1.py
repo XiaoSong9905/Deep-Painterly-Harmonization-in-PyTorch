@@ -22,10 +22,10 @@ for j in range(1, numGpus+1):
 					   ' -style_image   data/' + str(idx) + '_target.jpg '\
 					   ' -tight_mask    data/' + str(idx) + '_c_mask.jpg '\
 					   ' -dilated_mask  data/' + str(idx) + '_c_mask_dilated.jpg '\
-                       ' -inter_image   official_result/' + str(idx) + '_inter_res.jpg' \
+                       ' -inter_image   official_result/' + str(idx) + '_inter_res.jpg ' \
                        ' -gpu 0 ' \
-					   ' -output_img    output/' + str(idx) + '_inter_res.jpg'\
-                       ' -output_img_size 710' \
+					   ' -output_img    output/' + str(idx) + '_inter_res.jpg '\
+                       ' -output_img_size 710 ' \
                        ' -n_iter 1500 ' \
 					   ' -lr 1e1 ' \
 					   ' -print_interval 100 -save_img_interval 100 &&'

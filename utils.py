@@ -44,7 +44,7 @@ def setup(cfg):
         dtype, device = torch.cuda.FloatTensor, "cuda:"+str(cfg.gpu)
 
     
-    print('\n===> Configuration Setup')
+    print('\n===> Device Datatype Setup')
     print('device', device)
     print('dtype', dtype)
 
@@ -94,6 +94,12 @@ def get_args():
     parser.add_argument('-log_file', help='log file name', default='log.txt')
 
     cfg = parser.parse_args()
+
+    print('\n===> Configuration Setup')
+    print('style loss layer', cfg.style_layers)
+    print('content loss layer', cfg.content_layers)
+    print('histogram loss layer', cfg.histogram_layers)
+
     return cfg
 
 

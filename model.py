@@ -538,12 +538,6 @@ class StyleLossPass2(StyleLossPass1):
         self.ref_corr = None
         # TODO
 
-    def set_ref_infor(self, ref_corr):
-        self.ref_corr = ref_corr
-
-    def get_ref_infor(self):
-        return self.ref_corr
-
     def forward(self, input):
         # Step 2: Capture Style Feature Map & Compute Match & Compute Gram for ref layer
         if self.mode == 'capture_style_ref':

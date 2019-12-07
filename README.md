@@ -140,6 +140,14 @@ python3 pass2.py -gpu 0
 ```
 
 
+* Run on full detailed mode (if not specify, the program will run in silence mode) 
+
+```shell
+python3 pass1.py -verbose
+
+python3 pass2.py -verbose
+```
+
 
 * Run with specified style and content image 
 
@@ -192,6 +200,8 @@ python3 pass1.py -lr 1e-1 -p1_n_iters 2000 -p2_n_iters 1000
 * `log_on` : use log or not, default log off 
 
 * `log_file` : file name to log 
+
+* `verbose` : if not specify, then the program will run in silence mode
 
 
 

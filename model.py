@@ -335,7 +335,8 @@ class HistogramLoss(nn.Module):
 
         elif self.mode == 'loss':
             self.loss = self.weight * torch.sum((input - self.R) ** 2)
-            self.loss = self.loss / input.nelement()
+            self.loss = self.loss / input.numel()
+
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''

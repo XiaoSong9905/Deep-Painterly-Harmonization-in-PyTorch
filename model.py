@@ -189,7 +189,7 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self, weight, mask):
+    def __init__(self, device, dtype, weight, mask):
         super().__init__()
         self.R = None
         self.S = None
@@ -198,6 +198,8 @@ class HistogramLoss(nn.Module):
         self.mode = 'None'
         self.loss = 0
         self.mask = mask
+        self.device = device, 
+        self.dtype = dtype 
 
     # TODO: consider merge into forward
     # def find_match(self, input, idx):
@@ -328,9 +330,7 @@ class HistogramLoss(nn.Module):
         elif self.mode == 'capture_inter':
             # TODO: calulate histmatch(content, input), then calculate R
             R = self.hist_match(input, self.S)
-            import pdb; pdb.set_trace()
-            
-            self.R = torch.from_numpy(R).to(input.dtype, input.device)
+            self.R = torch.from_numpy(R).to(self.device).type(self.dtype)
             print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':
@@ -552,10 +552,10 @@ class StyleLossPass2(StyleLossPass1):
             if self.verbose:
                 print('StyleLossPass2 compute match relation')
             # Compute Gram Matrix
+            if self.verbose:
+                print('StyleLossPass2 compute style gram matrix (reference layer)')
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
-            if self.verbose:
-                print('StyleLossPass2 compute style gram matrix')
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
@@ -563,13 +563,14 @@ class StyleLossPass2(StyleLossPass1):
                 if self.verbose:
                     print('No ref_corr infor, do nothing.')
                 return input
+            if self.verbose:
+                print('StyleLossPass2 compute style gram matrix (others)')
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
             _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
             style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
             self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
-            if self.verbose:
-                print('StyleLossPass2 compute style gram matrix')
+
 
         # Step 1 : Capture Content Feature Map
         elif self.mode == 'capture_content':

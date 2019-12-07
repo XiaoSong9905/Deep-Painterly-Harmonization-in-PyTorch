@@ -34,7 +34,7 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
         i.mode = 'None'
 
     if verbose:
-        print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix')
+        print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix for Style Loss')
         print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
 
     for idx, i in enumerate(style_loss_list):  # TODO: change ref layer, and other layers
@@ -57,6 +57,8 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
         time_elapsed = time.time() - start_time
         print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
+    if verbose:
+        print('\n==> Start Capture Feature Map & Compute Match for Histogram Loss')
     # Histogram Loss 
     for i in histogram_loss_list:
         i.mode = 'capture_style'
@@ -91,7 +93,7 @@ def main():
     content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass2, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, dtype, loss_mask, StyleLossPass2, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
 
     # Capture FM & Compute Match 
     capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net, cfg.verbose)

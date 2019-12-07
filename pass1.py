@@ -133,7 +133,7 @@ TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(
     return img # 1 * 3 * H * W 
 
 
-def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss, verbose):
+def build_net(cfg, device, dtype, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss, verbose):
     # Setup Network 
     content_layers = cfg.content_layers.split(',')
     style_layers = cfg.style_layers.split(',')
@@ -208,7 +208,7 @@ def build_net(cfg, device, mask, StyleLoss, ContentLoss, TVLoss, HistogramLoss, 
             if cfg.mask_on == 'off':
                 mask = torch.ones_like(mask) # Mask of all 1 is used, which means no mask is used
 
-            histogram_layer_loss = HistogramLoss(weight=cfg.histogram_weight, mask=mask) # TODO add code for initializaiton
+            histogram_layer_loss = HistogramLoss(device=device, dtype=dtype, weight=cfg.histogram_weight, mask=mask) # TODO add code for initializaiton
             net.add_module(str(len(net)), histogram_layer_loss)
             histogram_loss_list.append(histogram_layer_loss)
 
@@ -269,7 +269,7 @@ def main():
     content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, dtype, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss, cfg.verbose)
 
     # Capture FM & Compute Match 
     capture_fm_pass1(content_loss_list, style_loss_list, tv_loss_list, content_img, style_img, net, cfg.verbose)

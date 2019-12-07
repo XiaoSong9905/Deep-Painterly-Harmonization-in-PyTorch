@@ -189,23 +189,25 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, content_L, weight=0.5):
         super().__init__()
-        self.weight = [0.5, 0, 0, 0.5]  # relu1_1 and relu4_1 has weight of 0.5
-        self.masks = [None for _ in range(4)]  # save matched result
-        self.mode = 'None'
+        self.R = None
         self.nbins = 256
         self.stride = 1
+        self.content_L = content_L # content layer
+        self.dtype = content_L.dtype
+        self.device = content_L.device
 
-    def find_match(self, input, target, idx):
-        n1, c1, h1, w1 = input.shape
-        n2, c2, h2, w2 = target.shape
-        input.resize_(h1 * w1 * h2 * w2)
-        target.resize_(h2 * w2 * h2 * w2)
+    # TODO: consider merge into forward
+    def find_match(self, input, idx):
+        n1, c1, h1, w1 = self.content_L.shape
+        n2, c2, h2, w2 = input.shape
+        self.content_L.resize_(h1 * w1 * h2 * w2)
+        input.resize_(h2 * w2 * h2 * w2)
         conv = torch.tensor((), dtype=torch.float32)
         conv = conv.new_zeros((h1 * w1, h2 * w2))
         conv.resize_(h1 * w1 * h2 * w2)
-        assert c1 == c2, 'input:c{} is not equal to target:c{}'.format(c1, c2)
+        assert c1 == c2, 'content:c{} is not equal to style:c{}'.format(c1, c2)
 
         size1 = h1 * w1
         size2 = h2 * w2
@@ -236,8 +238,8 @@ class HistogramLoss(nn.Module):
                         _i1 = yy1 * w1 + xx1
                         _i2 = yy2 * w2 + xx2
                         for c in range(0, c1):
-                            term1 = input[int(c * size1 + _i1)]
-                            term2 = target[int(c * size2 + _i2)]
+                            term1 = self.content_L[int(c * size1 + _i1)]
+                            term2 = input[int(c * size2 + _i2)]
                             conv_result += term1 * term2
                             norm1 += term1 * term1
                             norm2 += term2 * term2
@@ -248,7 +250,7 @@ class HistogramLoss(nn.Module):
             conv[i] = conv_result / (norm1 * norm2 + 1e-9)
 
         match = torch.tensor((), dtype=torch.float32)
-        match = match.new_zeros(input.size())
+        match = match.new_zeros(self.content_L.size())
 
         correspondence = torch.tensor((), dtype=torch.int16)
         correspondence.new_zeros((h1, w1, 2))
@@ -268,29 +270,22 @@ class HistogramLoss(nn.Module):
                         correspondence[id1 * 2 + 1] = y2
 
                         for c in range(0, c1):
-                            match[c * size1 + id1] = target[c * size2 + id2]
+                            match[c * size1 + id1] = input[c * size2 + id2]
 
         match.resize_((n1, c1, h1, w1))
         self.masks[idx] = match
         return match, correspondence
 
-    def forward(self, input, target=None):
-        # input is content, target is style.
-        # find hist match of R(input, target)
-        # then sum up of (((input - match)**2)_C*H*W * weight)_N
-        # TODO : do something 
-        if self.mode == 'find_match':
-            pass
-            # find historgram mapping
-        elif self.mode == 'loss':
-            loss = torch.tensor(0).to(input.dtype, input.device)
-            for idx, this_mask in enumerate(self.mask):
-                this_loss = torch.sum((input - this_mask) ** 2)
-                loss += self.weight[idx] * this_loss
-            return loss
-        else:
-            assert False, 'unknown mode for hist loss'
-        return input
+    def forward(self, input):
+        # input is style.
+        # find hist match of R(content, style)
+        # then sum up of (((content - match)**2)_C*H*W * weight)_N
+        ########
+        # TODO: calulate histmatch(content, input), then calculate R
+        ########
+        loss = self.weight * torch.sum((self.content_L - self.R) ** 2)
+        loss = torch.Tensor(loss).to(self.dtype, self.device)
+        return loss
 
 
 class StyleLossPass1(nn.Module):

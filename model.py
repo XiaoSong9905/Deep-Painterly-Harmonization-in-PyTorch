@@ -192,10 +192,87 @@ class HistogramLoss(nn.Module):
     def __init__(self):
         super().__init__()
         self.weight = [0.5, 0, 0, 0.5]  # relu1_1 and relu4_1 has weight of 0.5
-        self.masks = []  # save matched result
+        self.masks = [None for _ in range(4)]  # save matched result
         self.mode = 'None'
         self.nbins = 256
         self.stride = 1
+
+    def find_match(self, input, target, idx):
+        n1, c1, h1, w1 = input.shape
+        n2, c2, h2, w2 = target.shape
+        input.resize_(h1 * w1 * h2 * w2)
+        target.resize_(h2 * w2 * h2 * w2)
+        conv = torch.tensor((), dtype=torch.float32)
+        conv = conv.new_zeros((h1 * w1, h2 * w2))
+        conv.resize_(h1 * w1 * h2 * w2)
+        assert c1 == c2, 'input:c{} is not equal to target:c{}'.format(c1, c2)
+
+        size1 = h1 * w1
+        size2 = h2 * w2
+        N = h1 * w1 * h2 * w2
+        print('N is', N)
+
+        for i in range(0, N):
+            i1 = i / size2
+            i2 = i % size2
+            x1 = i1 % w1
+            y1 = i1 / w1
+            x2 = i2 % w2
+            y2 = i2 / w2
+            kernal_radius = int((self.nbins - 1) / 2)
+
+            conv_result = 0
+            norm1 = 0
+            norm2 = 0
+            dy = -kernal_radius
+            dx = -kernal_radius
+            while dy <= kernal_radius:
+                while dx <= kernal_radius:
+                    xx1 = x1 + dx
+                    yy1 = y1 + dy
+                    xx2 = x2 + dx
+                    yy2 = y2 + dy
+                    if 0 <= xx1 < w1 and 0 <= yy1 < h1 and 0 <= xx2 < w2 and 0 <= yy2 < h2:
+                        _i1 = yy1 * w1 + xx1
+                        _i2 = yy2 * w2 + xx2
+                        for c in range(0, c1):
+                            term1 = input[int(c * size1 + _i1)]
+                            term2 = target[int(c * size2 + _i2)]
+                            conv_result += term1 * term2
+                            norm1 += term1 * term1
+                            norm2 += term2 * term2
+                    dx += self.stride
+                dy += self.stride
+            norm1 = math.sqrt(norm1)
+            norm2 = math.sqrt(norm2)
+            conv[i] = conv_result / (norm1 * norm2 + 1e-9)
+
+        match = torch.tensor((), dtype=torch.float32)
+        match = match.new_zeros(input.size())
+
+        correspondence = torch.tensor((), dtype=torch.int16)
+        correspondence.new_zeros((h1, w1, 2))
+        correspondence.resize_(h1 * w1 * 2)
+
+        for id1 in range(0, size1):
+            conv_max = -1e20
+            for y2 in range(0, h2):
+                for x2 in range(0, w2):
+                    id2 = y2 * w2 + x2
+                    id = id1 * size2 + id2
+                    conv_result = conv[id1]
+
+                    if conv_result > conv_max:
+                        conv_max = conv_result
+                        correspondence[id1 * 2 + 0] = x2
+                        correspondence[id1 * 2 + 1] = y2
+
+                        for c in range(0, c1):
+                            match[c * size1 + id1] = target[c * size2 + id2]
+
+        match.resize_((n1, c1, h1, w1))
+        self.masks[idx] = match
+        return match, correspondence
 
     def forward(self, input, target=None):
         # input is content, target is style.

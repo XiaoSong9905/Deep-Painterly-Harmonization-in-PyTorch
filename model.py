@@ -122,6 +122,7 @@ class ContentLoss(nn.Module):
         self.criterian = nn.MSELoss()
         self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
+        self.loss = 0
 
     def forward(self, input):
         '''
@@ -248,8 +249,10 @@ class StyleLossPass1(nn.Module):
             print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match 
-            correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
-            #correspond_fm = style_fm
+            if self.weight > 0:
+                correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
+            else: # if weight 0, disable compute matching 
+                correspond_fm = style_fm
             print('StyleLossPass1 compute match relation')
 
             # Compute Gram Matrix 

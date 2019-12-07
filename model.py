@@ -195,6 +195,8 @@ class HistogramLoss(nn.Module):
         self.weight = weight
         self.nbins = 256
         self.stride = 1
+        self.mode = 'None'
+        self.O = None
 
     # TODO: consider merge into forward
     def find_match(self, input, idx):
@@ -318,16 +320,16 @@ class HistogramLoss(nn.Module):
         return b[bin_idx].reshape(oldshape)
 
 
-    def forward(self, content, input):
+    def forward(self, input):
         # input is style.
         # find hist match of R(content, style)
         # then sum up of (((content - match)**2)_C*H*W * weight)_N
         ########
         # TODO: calulate histmatch(content, input), then calculate R
-        R = self.hist_match(content, input)
+        R = self.hist_match(self.O, input)
         R = torch.tensor(R).to(input.dtype, input.device)
         ########
-        loss = self.weight * torch.sum((content - R) ** 2)
+        loss = self.weight * torch.sum((self.O - R) ** 2)
         loss = torch.Tensor(loss).to(input.dtype, input.device)
         return loss
 

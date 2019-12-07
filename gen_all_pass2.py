@@ -31,7 +31,7 @@ for j in range(1, numGpus+1):
                        ' -lr 3e-1 ' \
                        ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
                        ' -content_layers relu4_1 ' \
-                       ' -v ' \
+                       ' -verbose ' \
                        ' -print_interval 10 -save_img_interval 10 &&'
             else:
                 part_cmd2 =' python3 pass2.py '\
@@ -47,7 +47,7 @@ for j in range(1, numGpus+1):
                        ' -lr 3e-1 ' \
                        ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
                        ' -content_layers relu4_1 ' \
-                       ' -v ' \
+                       ' -verbose ' \
                        ' -print_interval 100 -save_img_interval 100 &&'
             cmd = cmd + part_cmd2
     cmd = cmd[1:len(cmd)-1]

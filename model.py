@@ -187,18 +187,26 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self, weight, mask):
+    def __init__(self):
         super().__init__()
-        self.weight = weight
-        self.mask = mask
+        self.weight = [0.5, 0, 0, 0.5] # relu1_1 and relu4_1 has weight of 0.5
+        self.mask = [] # save matched result
         self.mode = 'None'
 
-    def forward(self, input):
+    def forward(self, input, target=None):
+        # input is content, target is style.
+        # find hist match of R(input, target)
+        # then sum up of (((input - match)**2)_C*H*W * weight)_N
         # TODO : do something 
         if self.mode == 'find_match':
             pass
+            # find historgram mapping
         elif self.mode == 'loss':
-            pass
+            loss = torch.tensor(0).to(input.dtype, input.device)
+            for idx, this_mask in enumerate(self.mask):
+                this_loss = torch.sum((input-this_mask)**2)
+                loss += self.weight[idx] * this_loss
+            return loss
         else:
             assert False, 'unknown mode for hist loss'
         return input 

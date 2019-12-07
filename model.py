@@ -328,12 +328,12 @@ class HistogramLoss(nn.Module):
         elif self.mode == 'capture_inter':
             # TODO: calulate histmatch(content, input), then calculate R
             R = self.hist_match(input, self.S)
+
             self.R = torch.tensor(R).to(input.dtype, input.device)
             print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':
             self.loss = self.weight * torch.sum((input - self.R) ** 2)
-            self.loss = torch.Tensor(self.loss).to(input.dtype, input.device)
             self.loss = self.loss / input.nelement()
 
             def backward_variable_gradient_mask_hook_fn(grad):

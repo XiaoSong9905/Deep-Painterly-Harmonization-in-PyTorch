@@ -23,53 +23,17 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 ## TODO
 
-1. (dd, zw) StyleLossPass2 [DONE]
-
-2. (sx) StyleLossPass1 [DONE]
-
-3. (sx) Pass 1 debug & test validation [DONE]
-
-4. (zw, dd) Pass 2 (should be similar to pass 1 except broadcating the match relation between different layer)
-
-5. (sx) notebook for bp work on mask area [DONE]
-
-6. (sx) periodic save, periodic print [DONE]
-
-7. (sx) need to check in the original lua code, what does `dG:div(msk:sum())` is doing, why divide the gradient, how can this be acapted into out code. [DONE]
-
-8. (zw)TVLoss module [DONE]
-
-9. code update to support GPU setting, some job is done but not all. need to run on google colab to check GPU support [DONE]
-
-10. (sx) Auxilary network for style loss build, need to rewrite [DONE]
-
-11. (sx) train auxilary network [NEED TO CHECK WITH DAVID ON CONVERGENCE PROBLEM] 
-
-12. (sx) Supprot Tensorboard X for style transform and auxilary network  [DELAY]
-
-13. (zw) Code formatting [DONE]
-
-14. (sx) 存下来pass1现在有的问题，然后在progress report上说找到了问题 [DONE]
-
-15. pass2 rrelu5_1 是否有被用到， 把5_1的styel module删除掉
-
-16. (sx) pass1 参考源代码，更改match，解决产生noise的问题 (pass1 根据源代码 'patchmatch_r_conv_kernal' line 1228 cuda_utils.cu  )  [DONE]
-
-17. pass2 参考源代码，解决模糊的问题， 可能和match相关 [DONE]
-
-18. 拆分pass1, pass2为两个文件 [DONE]
-
-19. (sx) optimizer 不一样  [DONE]
-
-20. (sx) pass1中是否有histogram loss / total variance loss  [DONE]
-
-21. (sx) 存储float 0-255 图片的问题，需要试验一下,应该是没有问题的  [DONE] 
-
-22. (zw, dd) histogram loss in parss 2
-
 23. what's left to do : 如何解决noise， 一个段落 [DONE]
 
 24. Histogram Loss 
+
+25. Pass2 跑数据
+
+26. 完成poster，打印poster
+
+27. Final Report 
+
+28. 非论文的数据
 
 ## Requirement
 

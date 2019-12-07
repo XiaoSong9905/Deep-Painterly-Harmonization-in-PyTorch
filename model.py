@@ -195,7 +195,12 @@ class HistogramLoss(nn.Module):
 
     def forward(self, input):
         # TODO : do something 
-
+        if self.mode == 'find_match':
+            pass
+        elif self.mode == 'loss':
+            pass
+        else:
+            assert False, 'unknown mode for hist loss'
         return input 
 
 class StyleLossPass1(nn.Module):

@@ -189,15 +189,12 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self, content_L, weight=0.5):
+    def __init__(self, weight=0.5):
         super().__init__()
         self.R = None
         self.weight = weight
         self.nbins = 256
         self.stride = 1
-        self.content_L = content_L # content layer
-        self.dtype = content_L.dtype
-        self.device = content_L.device
 
     # TODO: consider merge into forward
     def find_match(self, input, idx):
@@ -321,17 +318,17 @@ class HistogramLoss(nn.Module):
         return b[bin_idx].reshape(oldshape)
 
 
-    def forward(self, input):
+    def forward(self, content, input):
         # input is style.
         # find hist match of R(content, style)
         # then sum up of (((content - match)**2)_C*H*W * weight)_N
         ########
         # TODO: calulate histmatch(content, input), then calculate R
-        R = self.hist_match(self.content_L, input)
-        R = torch.tensor(R).to(self.dtype, self.device)
+        R = self.hist_match(content, input)
+        R = torch.tensor(R).to(input.dtype, input.device)
         ########
-        loss = self.weight * torch.sum((self.content_L - R) ** 2)
-        loss = torch.Tensor(loss).to(self.dtype, self.device)
+        loss = self.weight * torch.sum((content - R) ** 2)
+        loss = torch.Tensor(loss).to(input.dtype, input.device)
         return loss
 
 

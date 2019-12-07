@@ -81,7 +81,7 @@ def main():
     content_img, style_img, inter_img, tight_mask, loss_mask = preprocess(cfg, dtype, device)
 
     # Build Network 
-    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass1, ContentLoss, TVLoss, HistogramLoss)
+    content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, net = build_net(cfg, device, loss_mask, StyleLossPass2, ContentLoss, TVLoss, HistogramLoss)
 
     # Capture FM & Compute Match 
     capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net)

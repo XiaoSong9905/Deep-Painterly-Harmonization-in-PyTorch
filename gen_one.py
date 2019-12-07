@@ -25,7 +25,7 @@ if pass12 == 1:
         ' -output_img_size 710' \
         ' -n_iter 1500 ' \
         ' -lr 1e1 ' \
-        ' -print_interval 100 -save_img_interval 10'
+        ' -print_interval 100 -save_img_interval 10 '
 elif pass12 == 2:
     cmd =' python3 pass2.py '\
         ' -content_image data/' + str(idx) + '_naive.jpg  '\
@@ -40,7 +40,7 @@ elif pass12 == 2:
         ' -lr 1e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
-        ' -print_interval 100 -save_img_interval 10 && '
+        ' -print_interval 100 -save_img_interval 10  '
 
 print('#',cmd)
 os.system(cmd)

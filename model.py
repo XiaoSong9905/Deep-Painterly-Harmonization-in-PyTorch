@@ -328,9 +328,7 @@ class HistogramLoss(nn.Module):
         elif self.mode == 'capture_inter':
             # TODO: calulate histmatch(content, input), then calculate R
             R = self.hist_match(input, self.S)
-            import pdb; pdb.set_trace()
-            
-            self.R = torch.from_numpy(R).to(input.dtype, input.device)
+            self.R = torch.from_numpy(R).to(self.device).type(self.dtype)
             print('His Loss Capture Inter Image Feature Map & Compute Match')
 
         elif self.mode == 'loss':

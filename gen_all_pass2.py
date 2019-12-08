@@ -24,13 +24,15 @@ for j in range(1, numGpus+1):
                        ' -tight_mask    data/' + str(idx) + '_c_mask.jpg '\
                        ' -dilated_mask  data/' + str(idx) + '_c_mask_dilated.jpg '\
                        ' -inter_image   official_result/' + str(idx) + '_inter_res.jpg ' \
-                       ' -gpu 0 ' \
+                       ' -gpu cpu ' \
                        ' -output_img    output/' + str(idx) + '_final_res.jpg '\
                        ' -output_img_size 710 ' \
                        ' -n_iter 3000 ' \
                        ' -lr 3e-1 ' \
                        ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
                        ' -content_layers relu4_1 ' \
+                       ' -histogram_layers relu1_1,relu4_1 ' \
+                       ' -histogram_weight 1 ' \
                        ' -verbose ' \
                        ' -print_interval 10 -save_img_interval 10 &&'
             else:
@@ -40,13 +42,15 @@ for j in range(1, numGpus+1):
                        ' -tight_mask    data/' + str(idx) + '_c_mask.jpg '\
                        ' -dilated_mask  data/' + str(idx) + '_c_mask_dilated.jpg '\
                        ' -inter_image   official_result/' + str(idx) + '_inter_res.jpg ' \
-                       ' -gpu 0 ' \
+                       ' -gpu cpu ' \
                        ' -output_img    output/' + str(idx) + '_final_res.jpg '\
                        ' -output_img_size 710 ' \
                        ' -n_iter 3000 ' \
                        ' -lr 3e-1 ' \
                        ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
                        ' -content_layers relu4_1 ' \
+                       ' -histogram_layers relu1_1,relu4_1 ' \
+                       ' -histogram_weight 1 ' \
                        ' -verbose ' \
                        ' -print_interval 100 -save_img_interval 100 &&'
             cmd = cmd + part_cmd2

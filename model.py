@@ -190,7 +190,7 @@ class GramMatrix(nn.Module):
 
 class HistogramLoss(nn.Module):
     def __init__(self, device, dtype, weight, mask):
-        super().__init__()
+        super(HistogramLoss, self).__init__()
         self.R = None
         self.S = None
         self.weight = weight
@@ -354,7 +354,7 @@ class HistogramLoss(nn.Module):
 
 class StyleLossPass1(nn.Module):
     def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
-        super().__init__()
+        super(StyleLossPass1, self).__init__()
         self.weight = weight
         self.critertain = nn.MSELoss()
         self.gram = GramMatrix()

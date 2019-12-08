@@ -35,7 +35,7 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
 
     if verbose:
         print('\n===> Start Capture Style Image Feature Map & Compute Matching Relation & Compute Target Gram Matrix for Style Loss')
-        print('total num of layers: ', len(style_loss_list), file=open('test.txt', 'w'))
+        print('total num of layers: ', len(style_loss_list))
 
     for idx, i in enumerate(style_loss_list):  # TODO: change ref layer, and other layers
         if idx == len(style_loss_list) - 1:  # last layer

@@ -121,7 +121,7 @@ class ContentLoss(nn.Module):
     def __init__(self, device, dtype, weight, loss_mask):
         super(ContentLoss, self).__init__()
         self.weight = weight
-        #self.criterian = nn.MSELoss()
+        self.criterian = nn.MSELoss()
         self.loss_mask = loss_mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.loss_mask_sum = 0
         self.device = device
@@ -150,7 +150,7 @@ class ContentLoss(nn.Module):
         # Step 2 : compute loss 
         elif self.mode == 'loss':
             #self.loss = self.criterian(torch.mul(input, self.loss_mask), self.content_fm_masked) * self.weight
-            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked, reduction='none') #/ self.loss_mask_sum
+            self.loss = self.criterian(torch.mul(input, self.loss_mask), self.content_fm_masked) / self.loss_mask_sum * input.nelement()
             self.loss = self.loss * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):

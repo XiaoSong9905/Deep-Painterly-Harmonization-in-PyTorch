@@ -36,7 +36,7 @@ elif pass12 == 2:
         ' -tight_mask    data/' + str(idx) + '_c_mask.jpg '\
         ' -dilated_mask  data/' + str(idx) + '_c_mask_dilated.jpg '\
         ' -inter_image   output/' + str(idx) + '_inter_res.jpg' \
-        ' -gpu cpu ' \
+        ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
         ' -n_iter 3000 ' \
@@ -46,7 +46,7 @@ elif pass12 == 2:
         ' -histogram_layers relu1_1,relu4_1 ' \
         ' -histogram_weight 0 ' \
         ' -style_weight 1e-4 ' \
-        ' -content_weight 1 ' \
+        ' -content_weight 5e-1 ' \
         ' -tv_weight 0.1 '\
         ' -print_interval 10 -save_img_interval 10  ' \
         ' -verbose '

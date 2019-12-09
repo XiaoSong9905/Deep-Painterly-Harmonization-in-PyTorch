@@ -80,6 +80,18 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
 
     return None
 
+def tight_mask_select(cfg, final_result, style_img, tight_mask):
+    assert(final_result.shape == style_img.shape)
+    tight_mask = tight_mask.expand_as(style_img)
+    output = tight_mask * final_result + (1 - tight_mask) * style_img
+
+    output_filename, file_extension = os.path.splitext(cfg.output_img)
+    filename = str(output_filename) + '_cropped_'+str(file_extension)
+    output_deprocessed = img_deprocess(img.clone())
+    output_deprocessed.save(str(filename))
+
+    return output
+
 
 def main():
     # Initial Config 
@@ -101,6 +113,9 @@ def main():
     # Training 
     final_result = train(cfg, device, net, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, start_img=inter_img, mask=loss_mask, verbose=cfg.verbose)
     
+    # Crop the object out of the resutl and past to the style image 
+    final_result = tight_mask_select(cfg, final_result, style_img, tight_mask)
+
     # End Log 
     end_log(orig_stdout)
 

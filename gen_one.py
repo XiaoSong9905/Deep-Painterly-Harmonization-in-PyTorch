@@ -48,7 +48,7 @@ elif pass12 == 2:
         ' -style_weight 1e-4 ' \
         ' -content_weight 1 ' \
         ' -tv_weight 0.1 '\
-        ' -print_interval 100 -save_img_interval 10  ' \
+        ' -print_interval 10 -save_img_interval 10  ' \
         ' -verbose '
 
 print('#',cmd)

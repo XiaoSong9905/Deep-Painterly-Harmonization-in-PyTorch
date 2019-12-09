@@ -145,12 +145,12 @@ class ContentLoss(nn.Module):
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm_masked.shape)))
 
             # Update Mask Size after feature map is captured 
-            #self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
 
         # Step 2 : compute loss 
         elif self.mode == 'loss':
             #self.loss = self.criterian(torch.mul(input, self.loss_mask), self.content_fm_masked) * self.weight
-            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked) / self.loss_mask_sum
+            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked, reduction='none') #/ self.loss_mask_sum
             self.loss = self.loss * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
@@ -387,7 +387,7 @@ class StyleLossPass1(nn.Module):
             print('StyleLoss captured content feature map with shape {} '.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            #self.loss_mask = self.loss_mask.expand_as(self.content_fm)
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm)
             self.loss_mask_sum = torch.sum(self.loss_mask) * self.content_fm.shape[1]
 
         # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 

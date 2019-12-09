@@ -190,7 +190,7 @@ class GramMatrix(nn.Module):
 
 
 class HistogramLoss(nn.Module):
-    def __init__(self, device, dtype, weight, mask):
+    def __init__(self, device, dtype, weight, loss_mask, tight_mask, n_bins):
         super(HistogramLoss, self).__init__()
         self.weight = weight
         self.n_bins = n_bins

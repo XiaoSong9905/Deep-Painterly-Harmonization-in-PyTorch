@@ -118,13 +118,15 @@ class TVLoss(nn.Module):
 
 
 class ContentLoss(nn.Module):
-    def __init__(self, weight, mask):
-        super().__init__()
+    def __init__(self, device, dtype, weight, loss_mask):
+        super(ContentLoss, self).__init__()
         self.weight = weight
         self.criterian = nn.MSELoss()
-        self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
+        self.loss_mask = loss_mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
+        self.device = device
+        self.dtype = dtype
         self.mode = 'None'
-        self.loss = None
+        self.loss = 0
 
     def forward(self, input):
         '''
@@ -152,7 +154,7 @@ class ContentLoss(nn.Module):
                 Notice : 
                     Variable hook is used in this case, Module hook is not supported for `complex moule` 
                 '''
-                return torch.mul(grad, self.mask)
+                return torch.mul(grad, self.loss_mask)
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
 
@@ -329,17 +331,17 @@ class HistogramLoss(nn.Module):
 '''
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
-        super().__init__()
+    def __init__(self, device, dtype, weight, loss_mask, match_patch_size, stride):
+        super(StyleLossPass1, self).__init__()
         self.weight = weight
-        self.critertain = nn.MSELoss()
-        self.gram = GramMatrix()
-        self.mask = mask.clone()
-        self.mode = 'None'
+        self.loss_mask = loss_mask.clone()
         self.patch_size = match_patch_size  # patch size for matching between feature map, in the original paper 3 is used
         self.stride = stride
         self.device = device
-        self.verbose = verbose
+        self.dtype = dtype
+        self.critertain = nn.MSELoss()
+        self.gram = GramMatrix()
+        self.mode = 'None'
 
     def forward(self, input):
         '''
@@ -354,33 +356,25 @@ class StyleLossPass1(nn.Module):
         # Step 1 : Capture Content Feature Map  
         if self.mode == 'capture_content':
             self.content_fm = input.detach()
-            if self.verbose:
-                print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+            print('StyleLoss captured content feature map with shape {} '.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.content_fm)
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm)
 
         # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
         elif self.mode == 'capture_style':  #
             style_fm = input.detach()
             assert (style_fm.shape == self.content_fm.shape)
-            if self.verbose:
-                print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
+            print('StyleLoss captured style feature map with shape {} '.format(str(style_fm.shape)))
 
             # Compute Match 
-            if self.weight > 0:
-                correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
-            else:  # if weight 0, disable compute matching
-                correspond_fm = style_fm
-            if self.verbose:
-                print('StyleLossPass1 compute match relation')
-
+            print('StyleLoss Compute Match Relaiton between content fm & style fm')
+            correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
+            
             # Compute Gram Matrix 
-            self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
-            # self.G = self.gram(correspond_fm) / correspond_fm.nelement()
+            print('StyleLoss Compute Gram Matrix')
+            self.G = self.gram(torch.mul(correspond_fm, self.loss_mask)) / torch.sum(self.loss_mask)
             self.target = self.G.detach()
-            if self.verbose:
-                print('StyleLossPass1 compute style gram matrix')
 
             del self.content_fm
             del style_fm
@@ -390,8 +384,7 @@ class StyleLossPass1(nn.Module):
             # self.G = self.gram(input)
             # self.G = self.G / input.nelement()
             # self.loss = self.critertain(self.G, self.target) * self.weight
-            self.G = self.gram(torch.mul(input, self.mask))
-            self.G = self.G / torch.sum(self.mask)
+            self.G = self.gram(torch.mul(input, self.loss_mask)) / torch.sum(self.loss_mask)
             self.loss = self.critertain(self.G, self.target) * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
@@ -401,7 +394,7 @@ class StyleLossPass1(nn.Module):
                 Notice : 
                     Variable hook is used in this case, Module hook is not supported for `complex moule` 
                 '''
-                return torch.mul(grad, self.mask)
+                return torch.mul(grad, self.loss_mask)
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
 
@@ -427,7 +420,6 @@ class StyleLossPass1(nn.Module):
             norm1 = sum(patch1**2)**0.5 
             norm2 = sum(patch2**2)**0.5 
             score = score / (norm1 * norm2 + 1e-9)
-
             When used at fm level, 
                 # norm_style = style_fm_pad**2 
                 # norm_style = conv(norm_style, kernal=3*3(1))
@@ -439,7 +431,6 @@ class StyleLossPass1(nn.Module):
                 #     score_map = score_map / (norm_style * norm_kernal + 1e-9 )
                 #     correspondence_idx = argmax(score_map)  -> (x, y)
                 #     correspondence = style_fm(idx)
-
         Notice : 
             to index into 4d Tensor [b, c, y, x] is used
         
@@ -447,7 +438,6 @@ class StyleLossPass1(nn.Module):
             correspond_fm  1 * C * H * W
             correspond_idx  2 * H * W first channel represent x index, second channel represent y index       
         '''
-
         # Padding Style FM & Content FM 
         stride = self.stride
         patch_size = self.patch_size
@@ -505,62 +495,47 @@ class StyleLossPass1(nn.Module):
 
         return correspond_fm, correspond_idx  # 1 * C * H * W, 2 * H * W (first channel is x)
 
-
 class StyleLossPass2(StyleLossPass1):
-    '''
-    child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
-    '''
-
-    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
-        super().__init__(weight, mask, match_patch_size, stride, device, verbose)
+    def __init__(self, device, dtype, weight, loss_mask, match_patch_size, stride):
+        super(StyleLossPass2, self).__init__(self, device, dtype, weight, loss_mask, match_patch_size, stride)
         self.ref_corr = None
-        # TODO
 
     def forward(self, input):
-        # Step 2: Capture Style Feature Map & Compute Match & Compute Gram for ref layer
-        if self.mode == 'capture_style_ref':
-            style_fm = input.detach()
-            if self.verbose:
-                print('StyleLossPass2 style feature map ref layer with shape {} captured'.format(str(style_fm.shape)))
-
-            # Compute Match
-            self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
-            if self.verbose:
-                print('StyleLossPass2 compute match relation')
-            # Compute Gram Matrix
-            if self.verbose:
-                print('StyleLossPass2 compute style gram matrix (reference layer)')
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
-
-        # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
-        elif self.mode == 'capture_style_others':
-            if self.ref_corr is None:
-                if self.verbose:
-                    print('No ref_corr infor, do nothing.')
-                return input
-            if self.verbose:
-                print('StyleLossPass2 compute style gram matrix (others)')
-            style_fm = input.detach()
-            _, _, curr_H, curr_W = input.shape
-            _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
-
-
         # Step 1 : Capture Content Feature Map
-        elif self.mode == 'capture_content':
+        if self.mode == 'capture_inter':
             self.content_fm = input.detach()
-            if self.verbose:
-                print('StyleLossPass2 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+            print('StyleLossPass2 captured intermediate img feature map with shape {} '.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured
             self.mask = self.mask.expand_as(self.content_fm)
 
+        # Step 2: Capture Style Feature Map & Compute Match & Compute Gram for ref layer
+        elif self.mode == 'capture_style_ref':
+            style_fm = input.detach()
+            print('StyleLossPass2 captured style feature map ref layer with shape {} & compute match relation & compute style gram matrix'.format(str(style_fm.shape)))
+
+            # Compute Match
+            self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
+
+            # Compute Gram Matrix
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.loss_mask)
+
+        # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
+        elif self.mode == 'capture_style_others':
+            if self.ref_corr is None:
+                print('No ref_corr infor, do nothing.')
+                return input
+            print('StyleLossPass2 compute style gram matrix (others)')
+            style_fm = input.detach()
+            _, _, curr_H, curr_W = input.shape
+            _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.loss_mask)
+
         # Step 4 : during updateing image
         elif self.mode == 'loss':
-            self.img_gram = self.gram(torch.mul(input, self.mask))
-            self.img_gram = self.img_gram / torch.sum(self.mask)
+            self.img_gram = self.gram(torch.mul(input, self.loss_mask)) / torch.sum(self.loss_mask)
             self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
 
         return input

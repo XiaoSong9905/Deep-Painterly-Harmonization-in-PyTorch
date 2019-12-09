@@ -15,10 +15,10 @@ from utils import *
 if not os.path.exists('output'):
     os.makedirs('output')
 
-def train(cfg, device, dtype, net, tight_mask, loss_mask, updated_img, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list):
+def train(cfg, device, dtype, net, tight_mask, loss_mask, optim_img, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list):
     '''
     Input:
-        updated_img (Tensor) : image that used for update. In pass1, updated_img = content_img. In pass1, update_img = pass1 output 
+        optim_img (Tensor) : image that used for update. In pass1, updated_img = content_img. In pass1, update_img = pass1 output 
     '''
     
     print('\n===> Start Updating Image')
@@ -29,8 +29,8 @@ def train(cfg, device, dtype, net, tight_mask, loss_mask, updated_img, content_l
         param.requires_grad = False
     
     # Set img gradient to be true to update image 
-    img = updated_img.clone()
-    img = nn.Parameter(updated_img)
+    img = optim_img.clone()
+    img = nn.Parameter(optim_img)
 
     # Keep track of loss 
     content_loss_his = []

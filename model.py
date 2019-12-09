@@ -189,41 +189,93 @@ class HistogramLoss(nn.Module):
     def __init__(self, device, dtype, weight, loss_mask, tight_mask, n_bins):
         super(HistogramLoss, self).__init__()
         self.weight = weight
-        self.nbins = n_bins
+        self.n_bins = n_bins
         self.loss_mask = loss_mask  # Weighted loss mask [0.-1.]
         self.tight_mask = tight_mask # Binary tight mask [0/1]
         self.device = device
         self.dtype = dtype 
         self.loss = 0
         self.style_fm_matched = None 
+        self.critertain = nn.MSELoss()
 
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
         
-        self.loss_mask = self.loss_mask.expand_as(input).contiguous()
-        self.tight_mask = self.tight_mask.expand_as(input).contiguous()
+        self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
+        self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched).contiguous()
 
         style_fm_matched_masked = self.style_fm_matched * self.tight_mask
-        self.style_his = torch.cat([torch.histc(style_fm_matched_masked[:, c, :, :], self.n_bins).unsqueeze(0) for i in range(style_fm_matched_masked.shape[1]) ])
+        
+        # Compute Histogram per channel of feature map (channel, 256)
+        self.style_his = torch.cat([torch.histc(style_fm_matched_masked[:, c, :, :], self.n_bins).unsqueeze(0) for c in range(style_fm_matched_masked.shape[1]) ])
         self.style_his = self.style_his.to(self.device) # style_his is the histogram of matched style image feature map over the masked region 
 
-    def remap_histogram(optim_img_fm):
-        
+    def select_idx(self, his, idx):
+        '''
+        Input:
+            his (tensor, (channel * 256))  
+        '''
+        C = his.shape[0]
+        output = his.view(-1)[idx.view(-1)].view(C, -1)
+        return output
+
+    def remap_histogram(self, optim_img_fm):
+        '''
+        Functionality:
+            build new feature map that have histogram corresponding to style image feature map's histogram 
+            this function is called every iteration 
+        Input:
+            optim_img_fm : feature map of the optimized image 
+        '''
+        # Only Use the masked region 
+        # TODO not sure if detach 
+        optim_img_fm = optim_img_fm.detach() * self.tight_mask
+
+        # Reshape to (channel, N=H*W)
+        optim_img_fm = optim_img_fm.reshape((optim_img_fm.shape[1], -1))
+        C, N = optim_img_fm.shape
+
+        # Sort feature map & remember corresponding index for each channel 
+        sort_fm, sort_idx = optim_img_fm.sort(1)
+        channel_min, channel_max = optim_img_fm.min(1)[0].unsqueeze(1), optim_img_fm.max(1)[0].unsqueeze(1)
+        step = (channel_max - channel_min) / self.n_bins
+        rng  = torch.arange(1, N+1).unsqueeze(0).to(self.device)
+
+        # Since style histogran not nessary have same number of N, scale it 
+        style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])
+        style_his_cdf = style_his.cumsum(1) # torch.Size([channel, 256])
+        style_his_cdf_prev = torch.cat([torch.zeros(ch,1).to(self.device), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
+
+        # Find Corresponding 
+        idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).to(self.dtype)
+        ratio = (rng - self.select_idx(style_his_cdf_prev, idx)) / (1e-8 + self.select_idx(style_his_cdf, idx))
+        ratio = ratio.squeeze().clamp(0,1)
+
+        # Build Correspponding FM 
+        optim_img_corr_fm = channel_min + (ratio + idx) * step
+        optim_img_corr_fm[:, -1] = channel_max[:, 0]
+        _, remap = sort_idx.sort()
+        optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
+
+        return optim_img_corr_fm 
 
     def forward(self, input):
-        self.loss = self.weight * torch.sum((input - self.R) ** 2)
-        self.loss = self.loss / input.numel()
+        corr_fm = self.remap_histogram(input) # (channel, N)
+        input_copy = input.detach()
+        input_copy = input_copy * self.tight_mask
+        input_copy = input_copy.reshape((input_copy.shape[0], -1))
+        self.loss = self.weight * self.critertain(corr_fm, input_copy)
 
-            def backward_variable_gradient_mask_hook_fn(grad):
-                '''
+        def backward_variable_gradient_mask_hook_fn(grad):
+            '''
                 Functionality : 
                     Return Gradient only over masked region
                 Notice : 
                     Variable hook is used in this case, Module hook is not supported for `complex moule` 
-                '''
-                return torch.mul(grad, self.mask)
+            '''
+            return torch.mul(grad, self.loss_mask)
 
-            input.register_hook(backward_variable_gradient_mask_hook_fn)
+        input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

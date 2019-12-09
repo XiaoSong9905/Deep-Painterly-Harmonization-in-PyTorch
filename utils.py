@@ -4,7 +4,6 @@
 import os 
 import torch 
 import torch.nn as nn 
-import torch.optim as optim 
 import torchvision.transforms as transforms 
 import torchvision.models as models
 import torchvision
@@ -22,6 +21,7 @@ def init_log(cfg):
     orig_stdout = sys.stdout
 
     if cfg.log_on == 'on':
+        print('\n==> Log setup to log.txt')
         sys.stdout = open('log.txt','w')
 
     message = "Deep Painterly Harmonization log file\n\
@@ -64,7 +64,7 @@ def get_args():
                         default=512)
 
     # Training Parameter
-    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam') # lbfgs currently not support 
+#    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam') # lbfgs currently not support 
     parser.add_argument("-lr", type=float, default=1e0)
     parser.add_argument("-n_iter", type=int, default=1000)
     parser.add_argument("-print_interval", type=int, default=150) 
@@ -89,7 +89,6 @@ def get_args():
     parser.add_argument("-noise_input_depth", type=int, default=1) # input depth for noise input to generator model 
 
     # Other 
-    parser.add_argument("-mask_on", choices=['on', 'off'], default='on') # if 'off' is choose, no mask is use, match is computed between whole content image fm and style image fm
     parser.add_argument('-log_on', choices=['on', 'off'], default='off') # if 'on' is choose, redirect output to log file 
     parser.add_argument('-log_file', help='log file name', default='log.txt')
     parser.add_argument('-verbose', help='print_information', action='store_true') # Print loss information during training or not
@@ -104,24 +103,24 @@ def get_args():
     return cfg
 
 
-def build_optimizer(cfg, img):
-    '''
-    Input:
-        img : Tensor type image with require_grad = True
-            can be build by passing image through `img = nn.Parameter(img)`
-    '''
-    # optimizer = torch.optim.SGD(model.parameters(), lr = 0.001)
-    assert(img.requires_grad==True)
-    if cfg.optim == 'adam':
-        optimizer = optim.Adam([img], cfg.lr)
-    elif cfg.optim == 'lbfgs':
-        # TODO lbfgs optimizer setup is different then Adam, setup this 
-        optimizer = None
-    else:
-        # TODO raise error that optimizer type not support 
-        return None
-    
-    return optimizer
+#def build_optimizer(cfg, img):
+#    '''
+#    Input:
+#        img : Tensor type image with require_grad = True
+#            can be build by passing image through `img = nn.Parameter(img)`
+#    '''
+#    # optimizer = torch.optim.SGD(model.parameters(), lr = 0.001)
+#    assert(img.requires_grad==True)
+#    if cfg.optim == 'adam':
+#        optimizer = torch.optim.Adam([img], cfg.lr)
+#    elif cfg.optim == 'lbfgs':
+#        # TODO lbfgs optimizer setup is different then Adam, setup this 
+#        optimizer = None
+#    else:
+#        # TODO raise error that optimizer type not support 
+#        return None
+#    
+#    return optimizer
 
 
 def mask_preprocess(mask_file, out_shape):
@@ -229,7 +228,9 @@ def preprocess(cfg, dtype, device, norm=True):
     inter_img = img_preprocess(cfg.inter_image, img_size).type(dtype).to(device) # 1 * 3 * H * W [0.-255.]s
     tight_mask = mask_preprocess(cfg.tight_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
     loss_mask = mask_preprocess(cfg.dilated_mask, img_size).type(dtype).to(device) # 1 * 1 * H * W [0/1]
-    #print('Output Image shape', (3, img_size[0], img_size[1]))
+    print('\n===> Preprocess Image and Mask')
+    print('img shape', content_img.shape)
+    print('mask shape', loss_mask.shape)
 
     return content_img, style_img, inter_img, tight_mask, loss_mask
 
@@ -256,15 +257,15 @@ def conv2d_same_padding(input, filter, stride=1):
     return F.conv2d(input, filter, stride=stride, padding=(padding_rows // 2, padding_cols // 2))
 
 
-def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his=None, histogram_loss_his=None, name=''):
+def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his, histogram_loss_his, name=''):
     assert(len(style_loss_his) == len(content_loss_his))
     x = np.arange(len(style_loss_his))
     c_his = plt.plot(x, content_loss_his, label='Content Loss')
     s_his = plt.plot(x, style_loss_his, label='Style Loss')
-    if tv_loss_his is not None:
+    if len(tv_loss_his) != 0:
         assert(len(tv_loss_his) == len(style_loss_his))
         tv_his = plt.plot(x, tv_loss_his, label='TV Loss')
-    if histogram_loss_his is not None:
+    if len(histogram_loss_his) != 0:
         assert(len(histogram_loss_his) == len(style_loss_his))
         h_his = plt.plot(x, histogram_loss_his, label='Histogram Loss')
     
@@ -273,3 +274,29 @@ def plt_plot_loss(style_loss_his, content_loss_his, tv_loss_his=None, histogram_
     plt.ylabel('Loss')
     plt.legend(loc = "best")
     plt.savefig(name+'loss_history.png')
+
+
+def dilate_mask(mask):
+    '''
+    Function : given tight mask, get dialated mask (loss mask)
+    '''
+    loose_mask = cv2.GaussianBlur(mask, (35,35) , 35/3)
+    loose_mask[loose_mask>=0.1] = 1
+    return loose_mask
+
+
+def tight_mask_crop(cfg, result, style_img, tight_mask):
+    '''
+    Input:
+        result (Tensor) : tensor that represent result of image after being updated
+    '''
+    assert(result.shape == style_img.shape)
+    tight_mask = tight_mask.expand_as(style_img)
+    output = tight_mask * result + (1 - tight_mask) * style_img
+
+    output_filename, file_extension = os.path.splitext(cfg.output_img)
+    filename = str(output_filename) + '_cropped_'+str(file_extension)
+    output_deprocessed = img_deprocess(output.clone())
+    output_deprocessed.save(str(filename))
+
+    return output

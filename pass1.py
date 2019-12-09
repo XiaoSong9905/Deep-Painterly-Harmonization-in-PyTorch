@@ -154,6 +154,7 @@ def build_net(cfg, device, dtype, tight_mask, loss_mask, StyleLoss, ContentLoss,
 
     # Build net with loss model 
     net = nn.Sequential()
+    next_content_idx, next_style_idx = 1, 1
 
     if cfg.tv_weight > 0:
         print('Add TVLoss at Position {}'.format(str(len(net))))
@@ -162,43 +163,46 @@ def build_net(cfg, device, dtype, tight_mask, loss_mask, StyleLoss, ContentLoss,
         tv_loss_list.append(tv_loss)
 
     for i, layer in enumerate(list(cnn)):
-        # Add original conv, relu, maxpool 
-        if isinstance(layer, nn.Conv2d):
-            net.add_module(str(len(net)), layer)
+        if next_content_idx <= len(content_layers) or next_style_idx <= len(style_layers):
+            # Add original conv, relu, maxpool 
+            if isinstance(layer, nn.Conv2d):
+                net.add_module(str(len(net)), layer)
 
-            # sap get a weighted loss mask, to see how this work, checkout the `understand mask` notebook 
-            sap = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
-            loss_mask = sap(loss_mask)
+                # sap get a weighted loss mask, to see how this work, checkout the `understand mask` notebook 
+                sap = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+                loss_mask = sap(loss_mask)
 
-        elif isinstance(layer, nn.ReLU):
-            net.add_module(str(len(net)), layer)
+            elif isinstance(layer, nn.ReLU):
+                net.add_module(str(len(net)), layer)
 
-        elif isinstance(layer, nn.MaxPool2d) or isinstance(layer, nn.AvgPool2d):
-            net.add_module(str(len(net)), layer)
+            elif isinstance(layer, nn.MaxPool2d) or isinstance(layer, nn.AvgPool2d):
+                net.add_module(str(len(net)), layer)
 
-            # Scale the mask into the corresponding spatial size
-            loss_mask = F.interpolate(loss_mask, scale_factor=(0.5, 0.5))  
-            tight_mask = F.interpolate(tight_mask, scale_factor=(0.5, 0.5))  
+                # Scale the mask into the corresponding spatial size
+                loss_mask = F.interpolate(loss_mask, scale_factor=(0.5, 0.5))  
+                tight_mask = F.interpolate(tight_mask, scale_factor=(0.5, 0.5))  
 
-        # Add Loss layer 
-        if layer_list[i] in content_layers and cfg.content_weight > 0:
-            print('Add Content Loss at Position {}'.format(str(len(net))))
-            content_loss_layer = ContentLoss(device=device, dtype=dtype, weight=cfg.content_weight, loss_mask=loss_mask)
-            net.add_module(str(len(net)), content_loss_layer)
-            content_loss_list.append(content_loss_layer)
+            # Add Loss layer 
+            if layer_list[i] in content_layers and cfg.content_weight > 0:
+                print('Add Content Loss at Position {}'.format(str(len(net))))
+                content_loss_layer = ContentLoss(device=device, dtype=dtype, weight=cfg.content_weight, loss_mask=loss_mask)
+                net.add_module(str(len(net)), content_loss_layer)
+                content_loss_list.append(content_loss_layer)
+                next_content_idx += 1
 
-        if layer_list[i] in style_layers and cfg.style_weight > 0:
-            print('Add Style Loss at Position {}'.format(str(len(net))))
-            style_loss_layer = StyleLoss(device=device, dtype=dtype, weight=cfg.style_weight, loss_mask=loss_mask, match_patch_size=cfg.match_patch_size, stride=1)
-            net.add_module(str(len(net)), style_loss_layer)
-            style_loss_list.append(style_loss_layer)
+            if layer_list[i] in style_layers and cfg.style_weight > 0:
+                print('Add Style Loss at Position {}'.format(str(len(net))))
+                style_loss_layer = StyleLoss(device=device, dtype=dtype, weight=cfg.style_weight, loss_mask=loss_mask, match_patch_size=cfg.match_patch_size, stride=1)
+                net.add_module(str(len(net)), style_loss_layer)
+                style_loss_list.append(style_loss_layer)
+                next_style_idx += 1
 
-        # For pass1, cfg.histogram_weight == 0, no histogram layer is added here
-        if layer_list[i] in histogram_layers and cfg.histogram_weight > 0:
-            print('Add Histogram Loss at Position {}'.format(str(len(net))))
-            histogram_loss_layer = HistogramLoss(device=device, dtype=dtype, weight=cfg.histogram_weight, loss_mask=loss_mask, tight_mask=tight_mask, n_bins=256) 
-            net.add_module(str(len(net)), histogram_loss_layer)
-            histogram_loss_list.append(histogram_loss_layer)
+            # For pass1, cfg.histogram_weight == 0, no histogram layer is added here
+            if layer_list[i] in histogram_layers and cfg.histogram_weight > 0:
+                print('Add Histogram Loss at Position {}'.format(str(len(net))))
+                histogram_loss_layer = HistogramLoss(device=device, dtype=dtype, weight=cfg.histogram_weight, loss_mask=loss_mask, tight_mask=tight_mask, n_bins=256) 
+                net.add_module(str(len(net)), histogram_loss_layer)
+                histogram_loss_list.append(histogram_loss_layer)
 
     del cnn  # delet unused net to save memory
 

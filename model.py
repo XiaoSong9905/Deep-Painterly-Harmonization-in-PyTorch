@@ -150,7 +150,7 @@ class ContentLoss(nn.Module):
         # Step 2 : compute loss 
         elif self.mode == 'loss':
             #self.loss = self.criterian(torch.mul(input, self.loss_mask), self.content_fm_masked) * self.weight
-            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked, size_average=False) / self.loss_mask_sum
+            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked) / self.loss_mask_sum
             self.loss = self.loss * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):

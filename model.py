@@ -212,6 +212,7 @@ class HistogramLoss(nn.Module):
         #self.critertain = nn.MSELoss()
         self.mode = 'None'
         self.loss_mask_sum = 0
+        self.count = 0
 
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
@@ -289,7 +290,13 @@ class HistogramLoss(nn.Module):
 
     def forward(self, input):
         if self.mode == 'loss':
-            corr_fm = self.remap_histogram(input) # (channel, N)
+            if self.count % 10 == 0:
+                corr_fm = self.remap_histogram(input) # (channel, N)
+                self.corr_fm = corr_fm
+                self.count = 0
+            else:
+                corr_fm = self.corr_fm
+                self.count = self.count + 1 
             self.loss = self.weight * F.mse_loss(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / input.nelement()
 
             def backward_variable_gradient_mask_hook_fn(grad):

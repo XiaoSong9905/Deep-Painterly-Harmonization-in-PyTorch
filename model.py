@@ -266,19 +266,21 @@ class HistogramLoss(nn.Module):
         rng  = torch.arange(1, N+1).unsqueeze(0).to(self.device)
 
         # Since style histogran not nessary have same number of N, scale it 
-        style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])
-        del style_his 
-        
+        style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])        
         style_his_cdf = style_his.cumsum(1) # torch.Size([channel, 256])
+        del style_his 
         style_his_cdf_prev = torch.cat([torch.zeros(C,1).to(self.device), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
 
         # Find Corresponding 
         idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).long() # index need long tensor 
         ratio = (rng - self.select_idx(style_his_cdf_prev, idx)) / (1e-8 + self.select_idx(style_his_cdf, idx))
+        del style_his_cdf_prevs
+        del style_his_cdf
         ratio = ratio.squeeze().clamp(0,1)
 
         # Build Correspponding FM 
         optim_img_corr_fm = channel_min + (ratio + idx) * step
+        del ratio
         optim_img_corr_fm[:, -1] = channel_max[:, 0]
         #_, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   

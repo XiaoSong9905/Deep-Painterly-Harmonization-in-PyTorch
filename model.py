@@ -141,11 +141,11 @@ class ContentLoss(nn.Module):
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.mask = self.mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
 
         # Step 2 : compute loss 
         elif self.mode == 'loss':
-            self.loss = self.criterian(input, self.content_fm) * self.weight
+            self.loss = self.criterian(input * self.loss_mask, self.content_fm) * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
@@ -209,7 +209,6 @@ class HistogramLoss(nn.Module):
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
         print('Histogram Loss Compute Style Image Histogram')
-        
         self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
         self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched).contiguous()
 
@@ -256,7 +255,7 @@ class HistogramLoss(nn.Module):
         style_his_cdf_prev = torch.cat([torch.zeros(C,1).to(self.device), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
 
         # Find Corresponding 
-        idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).to(self.dtype)
+        idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).long() # index need long tensor 
         ratio = (rng - self.select_idx(style_his_cdf_prev, idx)) / (1e-8 + self.select_idx(style_his_cdf, idx))
         ratio = ratio.squeeze().clamp(0,1)
 
@@ -273,7 +272,7 @@ class HistogramLoss(nn.Module):
             corr_fm = self.remap_histogram(input) # (channel, N)
             input_copy = input.detach()
             input_copy = input_copy * self.tight_mask
-            input_copy = input_copy.reshape((input_copy.shape[0], -1))
+            input_copy = input_copy.reshape((input_copy.shape[1], -1))
             self.loss = self.weight * self.critertain(corr_fm, input_copy)
 
             def backward_variable_gradient_mask_hook_fn(grad):
@@ -508,15 +507,15 @@ class StyleLossPass2(StyleLossPass1):
         # Step 1 : Capture Content Feature Map
         if self.mode == 'capture_inter':
             self.content_fm = input.detach()
-            print('StyleLossPass2 captured intermediate img feature map with shape {} '.format(str(self.content_fm.shape)))
+            print('Style Loss captured intermediate img feature map with shape {} '.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured
-            self.mask = self.mask.expand_as(self.content_fm)
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm)
 
         # Step 2: Capture Style Feature Map & Compute Match & Compute Gram for ref layer
         elif self.mode == 'capture_style_ref':
             style_fm = input.detach()
-            print('StyleLossPass2 captured style feature map ref layer with shape {} & compute match relation & compute style gram matrix'.format(str(style_fm.shape)))
+            print('Style Loss Reference Layer captured style feature map ref layer with shape {} & compute match relation & compute style gram matrix'.format(str(style_fm.shape)))
 
             # Compute Match
             self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
@@ -528,9 +527,9 @@ class StyleLossPass2(StyleLossPass1):
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
             if self.ref_corr is None:
-                print('No ref_corr infor, do nothing.')
+                #print('No ref_corr infor, do nothing.')
                 return input
-            print('StyleLossPass2 compute style gram matrix (others)')
+            print('Style Loss Other Layer captured style feature map with shape {} & use reference layer match relaiton & compite style gram matrix'.format(str(input.shape)))
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
             _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)

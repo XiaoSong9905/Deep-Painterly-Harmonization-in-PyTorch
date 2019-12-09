@@ -138,7 +138,7 @@ def build_net(cfg, device, dtype, tight_mask, loss_mask, StyleLoss, ContentLoss,
     # Setup Network 
     content_layers = cfg.content_layers.split(',')
     style_layers = cfg.style_layers.split(',')
-    histogram_layers = cfg.style_layers.split(',')
+    histogram_layers = cfg.histogram_layers.split(',')
     content_loss_list = []
     style_loss_list = []
     tv_loss_list = []

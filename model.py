@@ -276,7 +276,7 @@ class HistogramLoss(nn.Module):
     def forward(self, input):
         if self.mode == 'loss':
             corr_fm = self.remap_histogram(input) # (channel, N)
-            self.loss = self.weight * self.critertain(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / self.loss_mask_sum
+            self.loss = self.weight * self.critertain(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) 
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''

@@ -145,7 +145,7 @@ class ContentLoss(nn.Module):
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm_masked.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
+            self.loss_mask = self.loss_mask.expand_as(self.content_fm_masked)  # 1 * 1 * H * W -> 1 * C * H * W
 
         # Step 2 : compute loss 
         elif self.mode == 'loss':

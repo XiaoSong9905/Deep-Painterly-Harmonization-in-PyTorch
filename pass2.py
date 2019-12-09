@@ -52,10 +52,11 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     net(style_img)
 
     # Histogram Loss 
-    histogram_loss_list[0].style_fm_matched = style_loss_list[0].style_fm_matched
-    histogram_loss_list[1].style_fm_matched = style_loss_list[3].style_fm_matched
-    for i in histogram_loss_list:
-        i.compute_histogram() # compute histogram for style fm matched region inside mask 
+    if len(histogram_loss_list) != 0:
+        histogram_loss_list[0].style_fm_matched = style_loss_list[0].style_fm_matched
+        histogram_loss_list[1].style_fm_matched = style_loss_list[3].style_fm_matched
+        for i in histogram_loss_list:
+            i.compute_histogram() # compute histogram for style fm matched region inside mask 
 
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))

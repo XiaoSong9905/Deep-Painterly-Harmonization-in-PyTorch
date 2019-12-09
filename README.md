@@ -35,6 +35,8 @@ This PyTorch implementation follow the structure of [Neural Style Pt Github Link
 
 28. 非论文的数据
 
+19. 给模型缩水,不需要的层最后就不增加了
+
 ## Requirement
 
 * Dependency 

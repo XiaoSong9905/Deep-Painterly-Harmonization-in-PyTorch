@@ -35,7 +35,7 @@ elif pass12 == 2:
         ' -inter_image   output/' + str(idx) + '_inter_res.jpg' \
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
-        ' -output_img_size 710' \
+        ' -output_img_size 64' \
         ' -n_iter 3000 ' \
         ' -lr 3e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\

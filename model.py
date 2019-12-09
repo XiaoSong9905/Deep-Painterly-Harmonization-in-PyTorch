@@ -204,6 +204,7 @@ class HistogramLoss(nn.Module):
         self.style_fm_matched = None 
         self.style_his = None
         self.critertain = nn.MSELoss()
+        self.mode = 'None'
 
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
@@ -268,22 +269,23 @@ class HistogramLoss(nn.Module):
         return optim_img_corr_fm 
 
     def forward(self, input):
-        corr_fm = self.remap_histogram(input) # (channel, N)
-        input_copy = input.detach()
-        input_copy = input_copy * self.tight_mask
-        input_copy = input_copy.reshape((input_copy.shape[0], -1))
-        self.loss = self.weight * self.critertain(corr_fm, input_copy)
+        if self.mode == 'loss':
+            corr_fm = self.remap_histogram(input) # (channel, N)
+            input_copy = input.detach()
+            input_copy = input_copy * self.tight_mask
+            input_copy = input_copy.reshape((input_copy.shape[0], -1))
+            self.loss = self.weight * self.critertain(corr_fm, input_copy)
 
-        def backward_variable_gradient_mask_hook_fn(grad):
-            '''
-                Functionality : 
-                    Return Gradient only over masked region
-                Notice : 
-                    Variable hook is used in this case, Module hook is not supported for `complex moule` 
-            '''
-            return torch.mul(grad, self.loss_mask)
+            def backward_variable_gradient_mask_hook_fn(grad):
+                '''
+                    Functionality : 
+                        Return Gradient only over masked region
+                    Notice : 
+                        Variable hook is used in this case, Module hook is not supported for `complex moule` 
+                '''
+                return torch.mul(grad, self.loss_mask)
 
-        input.register_hook(backward_variable_gradient_mask_hook_fn)
+            input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

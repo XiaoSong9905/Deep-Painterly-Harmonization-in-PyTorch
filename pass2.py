@@ -95,7 +95,7 @@ def main():
     capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list, inter_img, content_img, style_img, net)
 
     # Training 
-    final_img, content_loss_his, style_loss_his, tv_loss_his, histogram_loss_his = train(cfg, device, dtype, net, tight_mask, loss_mask, content_img, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list)
+    final_img, content_loss_his, style_loss_his, tv_loss_his, histogram_loss_his = train(cfg, device, dtype, net, tight_mask, loss_mask, inter_img, content_loss_list, style_loss_list, tv_loss_list, histogram_loss_list)
     
     # Plot History 
     plt_plot_loss(content_loss_his, style_loss_his, tv_loss_his, histogram_loss_his, name='pass2')

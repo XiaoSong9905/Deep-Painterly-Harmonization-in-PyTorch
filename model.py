@@ -202,10 +202,12 @@ class HistogramLoss(nn.Module):
         self.dtype = dtype 
         self.loss = 0
         self.style_fm_matched = None 
+        self.style_his = None
         self.critertain = nn.MSELoss()
 
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
+        print('Histogram Loss Compute Style Image Histogram')
         
         self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
         self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched).contiguous()

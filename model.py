@@ -274,7 +274,7 @@ class HistogramLoss(nn.Module):
         # Find Corresponding 
         idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).long() # index need long tensor 
         ratio = (rng - self.select_idx(style_his_cdf_prev, idx)) / (1e-8 + self.select_idx(style_his_cdf, idx))
-        del style_his_cdf_prevs
+        del style_his_cdf_prev
         del style_his_cdf
         ratio = ratio.squeeze().clamp(0,1)
 

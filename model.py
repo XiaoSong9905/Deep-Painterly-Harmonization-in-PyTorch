@@ -205,12 +205,14 @@ class HistogramLoss(nn.Module):
         self.style_his = None
         self.critertain = nn.MSELoss()
         self.mode = 'None'
+        self.loss_mask_sum = 0
 
     def compute_histogram(self):
         assert(self.style_fm_matched is not None)
         print('Histogram Loss Compute Style Image Histogram')
         #self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
         #self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched) #.contiguous()
+        self.loss_mask_sum = torch.sum(self.tight_mask) * self.style_fm_matched.shape[1]
 
         style_fm_matched_masked = torch.mul(self.style_fm_matched, self.tight_mask)
                 
@@ -274,7 +276,7 @@ class HistogramLoss(nn.Module):
     def forward(self, input):
         if self.mode == 'loss':
             corr_fm = self.remap_histogram(input) # (channel, N)
-            self.loss = self.weight * self.critertain(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1)))
+            self.loss = self.weight * self.critertain(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / self.loss_mask_sum
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''

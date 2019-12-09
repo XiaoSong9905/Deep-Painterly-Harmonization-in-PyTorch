@@ -227,8 +227,13 @@ class HistogramLoss(nn.Module):
         self.style_his = self.style_his.to(self.device) # style_his is the histogram of matched style image feature map over the masked region 
 
         # Delete unused to save memory 
+        del style_fm_matched_masked
         del self.style_fm_matched
+        self.style_fm_matched = None
         del self.loss_mask
+        self.loss_mask_sum = None
+        import gc
+        gc.collect()
 
     def select_idx(self, his, idx):
         '''
@@ -236,8 +241,7 @@ class HistogramLoss(nn.Module):
             his (tensor, (channel * 256))  
         '''
         C = his.shape[0]
-        output = his.view(-1)[idx.view(-1)].view(C, -1)
-        return output
+        return his.view(-1)[idx.view(-1)].view(C, -1)
 
     def remap_histogram(self, optim_img_fm):
         '''
@@ -247,22 +251,24 @@ class HistogramLoss(nn.Module):
         Input:
             optim_img_fm : feature map of the optimized image 
         '''
-        # Only Use the masked region 
-        # TODO not sure if detach 
-        optim_img_fm = torch.mul(optim_img_fm.detach(), self.tight_mask)
-
-        # Reshape to (channel, N=H*W)
-        optim_img_fm = optim_img_fm.reshape((optim_img_fm.shape[1], -1))
+        # Only Use the masked region & reshape to (channel, N)
+        optim_img_fm = torch.mul(optim_img_fm, self.tight_mask).reshape((optim_img_fm.shape[1], -1))
         C, N = optim_img_fm.shape
 
         # Sort feature map & remember corresponding index for each channel 
         sort_fm, sort_idx = optim_img_fm.sort(1)
         channel_min, channel_max = optim_img_fm.min(1)[0].unsqueeze(1), optim_img_fm.max(1)[0].unsqueeze(1)
+        del optim_img_fm
+        import gc
+        gc.collect()
+
         step = (channel_max - channel_min) / self.n_bins
         rng  = torch.arange(1, N+1).unsqueeze(0).to(self.device)
 
         # Since style histogran not nessary have same number of N, scale it 
         style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])
+        del style_his 
+        
         style_his_cdf = style_his.cumsum(1) # torch.Size([channel, 256])
         style_his_cdf_prev = torch.cat([torch.zeros(C,1).to(self.device), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
 
@@ -274,7 +280,7 @@ class HistogramLoss(nn.Module):
         # Build Correspponding FM 
         optim_img_corr_fm = channel_min + (ratio + idx) * step
         optim_img_corr_fm[:, -1] = channel_max[:, 0]
-        _, remap = sort_idx.sort()
+        #_, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
 
         return optim_img_corr_fm 

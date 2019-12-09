@@ -44,7 +44,7 @@ elif pass12 == 2:
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \
-        ' -histogram_weight 5e5 ' \
+        ' -histogram_weight 0 ' \
         ' -style_weight 1e-4 ' \
         ' -content_weight 1 ' \
         ' -tv_weight 0.1 '\

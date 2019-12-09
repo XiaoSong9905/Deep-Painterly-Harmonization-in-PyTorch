@@ -39,7 +39,7 @@ elif pass12 == 2:
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
         ' -n_iter 3000 ' \
-        ' -lr 3e-1 ' \
+        ' -lr 1e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \

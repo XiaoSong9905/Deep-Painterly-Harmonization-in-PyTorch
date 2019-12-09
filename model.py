@@ -91,8 +91,9 @@ def build_backbone(cfg):
 
 class TVLoss(nn.Module):
     def __init__(self, weight):
-        super(TVLoss, self).__init__()
+        super().__init__()
         self.weight = weight
+        self.loss = None
 
     def forward(self, input):
         '''
@@ -117,15 +118,13 @@ class TVLoss(nn.Module):
 
 
 class ContentLoss(nn.Module):
-    def __init__(self, device, dtype, weight, loss_mask):
-        super(ContentLoss, self).__init__()
+    def __init__(self, weight, mask):
+        super().__init__()
         self.weight = weight
         self.criterian = nn.MSELoss()
-        self.loss_mask = loss_mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
-        self.device = device
-        self.dtype = dtype
+        self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
-        self.loss = 0
+        self.loss = None
 
     def forward(self, input):
         '''
@@ -153,7 +152,7 @@ class ContentLoss(nn.Module):
                 Notice : 
                     Variable hook is used in this case, Module hook is not supported for `complex moule` 
                 '''
-                return torch.mul(grad, self.loss_mask)
+                return torch.mul(grad, self.mask)
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
 
@@ -162,11 +161,12 @@ class ContentLoss(nn.Module):
 
 class GramMatrix(nn.Module):
     '''
+    Take Reference from https://github.com/ProGamerGov/neural-style-pt 
     To understand how gram matrix work, checkout `understand Gram Matrix` notebook 
     '''
 
     def __init__(self):
-        super(GramMatrix, self).__init__()
+        super().__init__()
 
     def forward(self, input):
         '''
@@ -184,9 +184,13 @@ class GramMatrix(nn.Module):
 
         return output
 
+        # B, C, H, W = input.size()
+        # x_flat = input.view(C, H * W)
+        # return torch.mm(x_flat, x_flat.t())
+
 
 class HistogramLoss(nn.Module):
-    def __init__(self, device, dtype, weight, loss_mask, tight_mask, n_bins):
+    def __init__(self, device, dtype, weight, mask):
         super(HistogramLoss, self).__init__()
         self.weight = weight
         self.n_bins = n_bins
@@ -279,140 +283,63 @@ class HistogramLoss(nn.Module):
 
         return input
 
-    # TODO: consider merge into forward
-    # def find_match(self, input, idx):
-    #     n1, c1, h1, w1 = self.content_L.shape
-    #     n2, c2, h2, w2 = input.shape
-    #     self.content_L.resize_(h1 * w1 * h2 * w2)
-    #     input.resize_(h2 * w2 * h2 * w2)
-    #     conv = torch.tensor((), dtype=torch.float32)
-    #     conv = conv.new_zeros((h1 * w1, h2 * w2))
-    #     conv.resize_(h1 * w1 * h2 * w2)
-    #     assert c1 == c2, 'content:c{} is not equal to style:c{}'.format(c1, c2)
-    #
-    #     size1 = h1 * w1
-    #     size2 = h2 * w2
-    #     N = h1 * w1 * h2 * w2
-    #     print('N is', N)
-    #
-    #     for i in range(0, N):
-    #         i1 = i / size2
-    #         i2 = i % size2
-    #         x1 = i1 % w1
-    #         y1 = i1 / w1
-    #         x2 = i2 % w2
-    #         y2 = i2 / w2
-    #         kernal_radius = int((self.nbins - 1) / 2)
-    #
-    #         conv_result = 0
-    #         norm1 = 0
-    #         norm2 = 0
-    #         dy = -kernal_radius
-    #         dx = -kernal_radius
-    #         while dy <= kernal_radius:
-    #             while dx <= kernal_radius:
-    #                 xx1 = x1 + dx
-    #                 yy1 = y1 + dy
-    #                 xx2 = x2 + dx
-    #                 yy2 = y2 + dy
-    #                 if 0 <= xx1 < w1 and 0 <= yy1 < h1 and 0 <= xx2 < w2 and 0 <= yy2 < h2:
-    #                     _i1 = yy1 * w1 + xx1
-    #                     _i2 = yy2 * w2 + xx2
-    #                     for c in range(0, c1):
-    #                         term1 = self.content_L[int(c * size1 + _i1)]
-    #                         term2 = input[int(c * size2 + _i2)]
-    #                         conv_result += term1 * term2
-    #                         norm1 += term1 * term1
-    #                         norm2 += term2 * term2
-    #                 dx += self.stride
-    #             dy += self.stride
-    #         norm1 = math.sqrt(norm1)
-    #         norm2 = math.sqrt(norm2)
-    #         conv[i] = conv_result / (norm1 * norm2 + 1e-9)
-    #
-    #     match = torch.tensor((), dtype=torch.float32)
-    #     match = match.new_zeros(self.content_L.size())
-    #
-    #     correspondence = torch.tensor((), dtype=torch.int16)
-    #     correspondence.new_zeros((h1, w1, 2))
-    #     correspondence.resize_(h1 * w1 * 2)
-    #
-    #     for id1 in range(0, size1):
-    #         conv_max = -1e20
-    #         for y2 in range(0, h2):
-    #             for x2 in range(0, w2):
-    #                 id2 = y2 * w2 + x2
-    #                 id = id1 * size2 + id2
-    #                 conv_result = conv[id1]
-    #
-    #                 if conv_result > conv_max:
-    #                     conv_max = conv_result
-    #                     correspondence[id1 * 2 + 0] = x2
-    #                     correspondence[id1 * 2 + 1] = y2
-    #
-    #                     for c in range(0, c1):
-    #                         match[c * size1 + id1] = input[c * size2 + id2]
-    #
-    #     match.resize_((n1, c1, h1, w1))
-    #     self.masks[idx] = match
-    #     return match, correspondence
+'''
+    def find_nearest_above(self, my_array, target):
+        diff = my_array - target
+        mask = np.ma.less_equal(diff, -1)
+        # We need to mask the negative differences
+        # since we are looking for values above
+        if np.all(mask):
+            c = np.abs(diff).argmin()
+            return c  # returns min index of the nearest if target is greater than any value
+        masked_diff = np.ma.masked_array(diff, mask)
+        return masked_diff.argmin()
 
-    #def find_nearest_above(self, my_array, target):
-    #    diff = my_array - target
-    #    mask = np.ma.less_equal(diff, -1)
-    #    # We need to mask the negative differences
-    #    # since we are looking for values above
-    #    if np.all(mask):
-    #        c = np.abs(diff).argmin()
-    #        return c  # returns min index of the nearest if target is greater than any value
-    #    masked_diff = np.ma.masked_array(diff, mask)
-    #    return masked_diff.argmin()
+    def hist_match(self, A, B):
+        original = A.cpu().detach().numpy()
+        specified = B.cpu().detach().numpy()
 
-    #def hist_match(self, A, B):
-    #    original = A.cpu().detach().numpy()
-    #    specified = B.cpu().detach().numpy()
+        oldshape = original.shape
+        original = original.ravel()
+        specified = specified.ravel()
 
-    #    oldshape = original.shape
-    #    original = original.ravel()
-    #    specified = specified.ravel()
+        # get the set of unique pixel values and their corresponding indices and counts
+        s_values, bin_idx, s_counts = np.unique(original, return_inverse=True, return_counts=True)
+        t_values, t_counts = np.unique(specified, return_counts=True)
 
-    #    # get the set of unique pixel values and their corresponding indices and counts
-    #   s_values, bin_idx, s_counts = np.unique(original, return_inverse=True, return_counts=True)
-    #   t_values, t_counts = np.unique(specified, return_counts=True)
+        # Calculate s_k for original image
+        s_quantiles = np.cumsum(s_counts).astype(np.float64)
+        s_quantiles /= s_quantiles[-1]
 
-    #    # Calculate s_k for original image
-    #    s_quantiles = np.cumsum(s_counts).astype(np.float64)
-    #    s_quantiles /= s_quantiles[-1]
+        # Calculate s_k for specified image
+        t_quantiles = np.cumsum(t_counts).astype(np.float64)
+        t_quantiles /= t_quantiles[-1]
 
-    #    # Calculate s_k for specified image
-    #    t_quantiles = np.cumsum(t_counts).astype(np.float64)
-    #    t_quantiles /= t_quantiles[-1]
+        # Round the values
+        sour = np.around(s_quantiles * 255)
+        temp = np.around(t_quantiles * 255)
 
-    #    # Round the values
-    #    sour = np.around(s_quantiles * 255)
-    #    temp = np.around(t_quantiles * 255)
+        # Map the rounded values
+        b = []
+        for data in sour[:]:
+            b.append(self.find_nearest_above(temp, data))
+        b = np.array(b, dtype='uint8')
 
-    #    # Map the rounded values
-    #    b = []
-    #    for data in sour[:]:
-    #        b.append(self.find_nearest_above(temp, data))
-    #    b = np.array(b, dtype='uint8')
-
-    #    return b[bin_idx].reshape(oldshape)
-
+        return b[bin_idx].reshape(oldshape)
+'''
 
 class StyleLossPass1(nn.Module):
-    def __init__(self, device, dtype, weight, loss_mask, match_patch_size, stride):
-        super(StyleLossPass1, self).__init__()
+    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
+        super().__init__()
         self.weight = weight
-        self.loss_mask = loss_mask.clone()
+        self.critertain = nn.MSELoss()
+        self.gram = GramMatrix()
+        self.mask = mask.clone()
+        self.mode = 'None'
         self.patch_size = match_patch_size  # patch size for matching between feature map, in the original paper 3 is used
         self.stride = stride
         self.device = device
-        self.dtype = dtype
-        self.critertain = nn.MSELoss()
-        self.gram = GramMatrix()
-        self.mode = 'None'
+        self.verbose = verbose
 
     def forward(self, input):
         '''
@@ -427,25 +354,33 @@ class StyleLossPass1(nn.Module):
         # Step 1 : Capture Content Feature Map  
         if self.mode == 'capture_content':
             self.content_fm = input.detach()
-            print('StyleLoss captured content feature map with shape {} '.format(str(self.content_fm.shape)))
+            if self.verbose:
+                print('StyleLossPass1 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.loss_mask = self.loss_mask.expand_as(self.content_fm)
+            self.mask = self.mask.expand_as(self.content_fm)
 
         # Step 2 : Capture Style Feature Map & Compute Match & Compute Gram 
         elif self.mode == 'capture_style':  #
             style_fm = input.detach()
             assert (style_fm.shape == self.content_fm.shape)
-            print('StyleLoss captured style feature map with shape {} '.format(str(style_fm.shape)))
+            if self.verbose:
+                print('StyleLossPass1 style feature map with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match 
-            print('StyleLoss Compute Match Relaiton between content fm & style fm')
-            correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
-            
+            if self.weight > 0:
+                correspond_fm, correspond_idx = self.match_fm(self.content_fm, style_fm)
+            else:  # if weight 0, disable compute matching
+                correspond_fm = style_fm
+            if self.verbose:
+                print('StyleLossPass1 compute match relation')
+
             # Compute Gram Matrix 
-            print('StyleLoss Compute Gram Matrix')
-            self.G = self.gram(torch.mul(correspond_fm, self.loss_mask)) / torch.sum(self.loss_mask)
+            self.G = self.gram(torch.mul(correspond_fm, self.mask)) / torch.sum(self.mask)
+            # self.G = self.gram(correspond_fm) / correspond_fm.nelement()
             self.target = self.G.detach()
+            if self.verbose:
+                print('StyleLossPass1 compute style gram matrix')
 
             del self.content_fm
             del style_fm
@@ -455,7 +390,8 @@ class StyleLossPass1(nn.Module):
             # self.G = self.gram(input)
             # self.G = self.G / input.nelement()
             # self.loss = self.critertain(self.G, self.target) * self.weight
-            self.G = self.gram(torch.mul(input, self.loss_mask)) / torch.sum(self.loss_mask)
+            self.G = self.gram(torch.mul(input, self.mask))
+            self.G = self.G / torch.sum(self.mask)
             self.loss = self.critertain(self.G, self.target) * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
@@ -465,7 +401,7 @@ class StyleLossPass1(nn.Module):
                 Notice : 
                     Variable hook is used in this case, Module hook is not supported for `complex moule` 
                 '''
-                return torch.mul(grad, self.loss_mask)
+                return torch.mul(grad, self.mask)
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
 
@@ -511,6 +447,7 @@ class StyleLossPass1(nn.Module):
             correspond_fm  1 * C * H * W
             correspond_idx  2 * H * W first channel represent x index, second channel represent y index       
         '''
+
         # Padding Style FM & Content FM 
         stride = self.stride
         patch_size = self.patch_size
@@ -570,46 +507,60 @@ class StyleLossPass1(nn.Module):
 
 
 class StyleLossPass2(StyleLossPass1):
-    def __init__(self, device, dtype, weight, loss_mask, match_patch_size, stride):
-        super(StyleLossPass2, self).__init__(self, device, dtype, weight, loss_mask, match_patch_size, stride)
+    '''
+    child class of StyleLossPass1 that's capable of compute nearest neighbor like pass 1 
+    '''
+
+    def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
+        super().__init__(weight, mask, match_patch_size, stride, device, verbose)
         self.ref_corr = None
+        # TODO
 
     def forward(self, input):
-        # Step 1 : Capture Content Feature Map
-        if self.mode == 'capture_inter':
-            self.content_fm = input.detach()
-            print('StyleLossPass2 captured intermediate img feature map with shape {} '.format(str(self.content_fm.shape)))
-
-            # Update Mask Size after feature map is captured
-            self.mask = self.mask.expand_as(self.content_fm)
-
         # Step 2: Capture Style Feature Map & Compute Match & Compute Gram for ref layer
-        elif self.mode == 'capture_style_ref':
+        if self.mode == 'capture_style_ref':
             style_fm = input.detach()
-            print('StyleLossPass2 captured style feature map ref layer with shape {} & compute match relation & compute style gram matrix'.format(str(style_fm.shape)))
+            if self.verbose:
+                print('StyleLossPass2 style feature map ref layer with shape {} captured'.format(str(style_fm.shape)))
 
             # Compute Match
             self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
-
+            if self.verbose:
+                print('StyleLossPass2 compute match relation')
             # Compute Gram Matrix
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.loss_mask)
+            if self.verbose:
+                print('StyleLossPass2 compute style gram matrix (reference layer)')
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
             if self.ref_corr is None:
-                print('No ref_corr infor, do nothing.')
+                if self.verbose:
+                    print('No ref_corr infor, do nothing.')
                 return input
-            print('StyleLossPass2 compute style gram matrix (others)')
+            if self.verbose:
+                print('StyleLossPass2 compute style gram matrix (others)')
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
             _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.loss_mask)
+            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.mask)
+            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.mask)
+
+
+        # Step 1 : Capture Content Feature Map
+        elif self.mode == 'capture_content':
+            self.content_fm = input.detach()
+            if self.verbose:
+                print('StyleLossPass2 content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+
+            # Update Mask Size after feature map is captured
+            self.mask = self.mask.expand_as(self.content_fm)
 
         # Step 4 : during updateing image
         elif self.mode == 'loss':
-            self.img_gram = self.gram(torch.mul(input, self.loss_mask)) / torch.sum(self.loss_mask)
+            self.img_gram = self.gram(torch.mul(input, self.mask))
+            self.img_gram = self.img_gram / torch.sum(self.mask)
             self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
 
         return input

@@ -91,8 +91,9 @@ def build_backbone(cfg):
 
 class TVLoss(nn.Module):
     def __init__(self, weight):
-        super(TVLoss, self).__init__()
+        super().__init__()
         self.weight = weight
+        self.loss = None
 
     def forward(self, input):
         '''
@@ -118,12 +119,12 @@ class TVLoss(nn.Module):
 
 class ContentLoss(nn.Module):
     def __init__(self, weight, mask):
-        super(ContentLoss, self).__init__()
+        super().__init__()
         self.weight = weight
         self.criterian = nn.MSELoss()
         self.mask = mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
         self.mode = 'None'
-        self.loss = 0
+        self.loss = None
 
     def forward(self, input):
         '''
@@ -165,7 +166,7 @@ class GramMatrix(nn.Module):
     '''
 
     def __init__(self):
-        super(GramMatrix, self).__init__()
+        super().__init__()
 
     def forward(self, input):
         '''
@@ -190,94 +191,16 @@ class GramMatrix(nn.Module):
 
 class HistogramLoss(nn.Module):
     def __init__(self, device, dtype, weight, mask):
-        super(HistogramLoss, self).__init__()
+        super().__init__()
         self.R = None
         self.S = None
         self.weight = weight
         self.nbins = 256
         self.mode = 'None'
-        self.loss = 0
+        self.loss = None
         self.mask = mask
         self.device = device
-        self.dtype = dtype 
-
-    # TODO: consider merge into forward
-    # def find_match(self, input, idx):
-    #     n1, c1, h1, w1 = self.content_L.shape
-    #     n2, c2, h2, w2 = input.shape
-    #     self.content_L.resize_(h1 * w1 * h2 * w2)
-    #     input.resize_(h2 * w2 * h2 * w2)
-    #     conv = torch.tensor((), dtype=torch.float32)
-    #     conv = conv.new_zeros((h1 * w1, h2 * w2))
-    #     conv.resize_(h1 * w1 * h2 * w2)
-    #     assert c1 == c2, 'content:c{} is not equal to style:c{}'.format(c1, c2)
-    #
-    #     size1 = h1 * w1
-    #     size2 = h2 * w2
-    #     N = h1 * w1 * h2 * w2
-    #     print('N is', N)
-    #
-    #     for i in range(0, N):
-    #         i1 = i / size2
-    #         i2 = i % size2
-    #         x1 = i1 % w1
-    #         y1 = i1 / w1
-    #         x2 = i2 % w2
-    #         y2 = i2 / w2
-    #         kernal_radius = int((self.nbins - 1) / 2)
-    #
-    #         conv_result = 0
-    #         norm1 = 0
-    #         norm2 = 0
-    #         dy = -kernal_radius
-    #         dx = -kernal_radius
-    #         while dy <= kernal_radius:
-    #             while dx <= kernal_radius:
-    #                 xx1 = x1 + dx
-    #                 yy1 = y1 + dy
-    #                 xx2 = x2 + dx
-    #                 yy2 = y2 + dy
-    #                 if 0 <= xx1 < w1 and 0 <= yy1 < h1 and 0 <= xx2 < w2 and 0 <= yy2 < h2:
-    #                     _i1 = yy1 * w1 + xx1
-    #                     _i2 = yy2 * w2 + xx2
-    #                     for c in range(0, c1):
-    #                         term1 = self.content_L[int(c * size1 + _i1)]
-    #                         term2 = input[int(c * size2 + _i2)]
-    #                         conv_result += term1 * term2
-    #                         norm1 += term1 * term1
-    #                         norm2 += term2 * term2
-    #                 dx += self.stride
-    #             dy += self.stride
-    #         norm1 = math.sqrt(norm1)
-    #         norm2 = math.sqrt(norm2)
-    #         conv[i] = conv_result / (norm1 * norm2 + 1e-9)
-    #
-    #     match = torch.tensor((), dtype=torch.float32)
-    #     match = match.new_zeros(self.content_L.size())
-    #
-    #     correspondence = torch.tensor((), dtype=torch.int16)
-    #     correspondence.new_zeros((h1, w1, 2))
-    #     correspondence.resize_(h1 * w1 * 2)
-    #
-    #     for id1 in range(0, size1):
-    #         conv_max = -1e20
-    #         for y2 in range(0, h2):
-    #             for x2 in range(0, w2):
-    #                 id2 = y2 * w2 + x2
-    #                 id = id1 * size2 + id2
-    #                 conv_result = conv[id1]
-    #
-    #                 if conv_result > conv_max:
-    #                     conv_max = conv_result
-    #                     correspondence[id1 * 2 + 0] = x2
-    #                     correspondence[id1 * 2 + 1] = y2
-    #
-    #                     for c in range(0, c1):
-    #                         match[c * size1 + id1] = input[c * size2 + id2]
-    #
-    #     match.resize_((n1, c1, h1, w1))
-    #     self.masks[idx] = match
-    #     return match, correspondence
+        self.dtype = dtype
 
     def find_nearest_above(self, my_array, target):
         diff = my_array - target
@@ -337,7 +260,6 @@ class HistogramLoss(nn.Module):
             self.loss = self.weight * torch.sum((input - self.R) ** 2)
             self.loss = self.loss / input.numel()
 
-
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
                 Functionality : 
@@ -354,7 +276,7 @@ class HistogramLoss(nn.Module):
 
 class StyleLossPass1(nn.Module):
     def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
-        super(StyleLossPass1, self).__init__()
+        super().__init__()
         self.weight = weight
         self.critertain = nn.MSELoss()
         self.gram = GramMatrix()
@@ -536,7 +458,7 @@ class StyleLossPass2(StyleLossPass1):
     '''
 
     def __init__(self, weight, mask, match_patch_size, stride=1, device='cpu', verbose=False):
-        super(StyleLossPass2, self).__init__(weight, mask, match_patch_size, stride, device, verbose)
+        super().__init__(weight, mask, match_patch_size, stride, device, verbose)
         self.ref_corr = None
         # TODO
 

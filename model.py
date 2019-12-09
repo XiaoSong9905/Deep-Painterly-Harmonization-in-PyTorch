@@ -497,7 +497,7 @@ class StyleLossPass1(nn.Module):
 
 class StyleLossPass2(StyleLossPass1):
     def __init__(self, device, dtype, weight, loss_mask, match_patch_size, stride):
-        super(StyleLossPass2, self).__init__(self, device, dtype, weight, loss_mask, match_patch_size, stride)
+        super(StyleLossPass2, self).__init__(device, dtype, weight, loss_mask, match_patch_size, stride)
         self.ref_corr = None
 
     def forward(self, input):

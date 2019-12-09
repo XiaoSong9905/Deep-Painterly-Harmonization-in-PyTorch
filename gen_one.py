@@ -27,7 +27,8 @@ if pass12 == 1:
         ' -output_img_size ' + str(size) + ' ' \
         ' -n_iter 3000 ' \
         ' -lr 3e-1 ' \
-        ' -print_interval 100 -save_img_interval 10 '
+        ' -print_interval 100 -save_img_interval 10 '\
+        ' -verbose '
 elif pass12 == 2:
     cmd =' python3 pass2.py '\
         ' -content_image data/' + str(idx) + '_naive.jpg  '\
@@ -38,13 +39,16 @@ elif pass12 == 2:
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
-        ' -n_iter 3000 ' \
+        ' -n_iter 1000 ' \
         ' -lr 1e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \
-        ' -histogram_weight 0.5 ' \
-        ' -print_interval 100 -save_img_interval 100  ' \
+        ' -histogram_weight 1 ' \
+        ' -style_weight 0.1 ' \
+        ' -content_weight 1 ' \
+        ' -tv_weight 0.1 '\
+        ' -print_interval 100 -save_img_interval 10  ' \
         ' -verbose '
 
 print('#',cmd)

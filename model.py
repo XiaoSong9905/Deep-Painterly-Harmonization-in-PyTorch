@@ -121,12 +121,14 @@ class ContentLoss(nn.Module):
     def __init__(self, device, dtype, weight, loss_mask):
         super(ContentLoss, self).__init__()
         self.weight = weight
-        self.criterian = nn.MSELoss()
+        #self.criterian = nn.MSELoss()
         self.loss_mask = loss_mask.clone()  # a weighted mask, not binary mask. To see why check `understand mask` notebook
+        self.loss_mask_sum = 0
         self.device = device
         self.dtype = dtype
         self.mode = 'None'
         self.loss = 0
+        self.content_fm_masked = None
 
     def forward(self, input):
         '''
@@ -137,15 +139,19 @@ class ContentLoss(nn.Module):
         # Step 1 : capture content image feature map 
         if self.mode == 'capture':
             # Capture Feature Map
-            self.content_fm = input.detach()
+            self.content_fm_masked = input.detach()
+            self.content_fm_masked = torch.mul(self.content_fm_masked, self.loss_mask)
+            self.loss_mask_sum = torch.sum(self.loss_mask) * self.content_fm_masked.shape[1]
             print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
 
             # Update Mask Size after feature map is captured 
-            self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
+            #self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W
 
         # Step 2 : compute loss 
         elif self.mode == 'loss':
-            self.loss = self.criterian(input * self.loss_mask, self.content_fm) * self.weight
+            #self.loss = self.criterian(torch.mul(input, self.loss_mask), self.content_fm_masked) * self.weight
+            self.loss = F.mse_loss(torch.mul(input, self.loss_mask), self.content_fm_masked, size_average=False) / self.loss_mask_sum
+            self.loss = self.loss * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
@@ -203,7 +209,7 @@ class HistogramLoss(nn.Module):
         self.loss = 0
         self.style_fm_matched = None 
         self.style_his = None
-        self.critertain = nn.MSELoss()
+        #self.critertain = nn.MSELoss()
         self.mode = 'None'
         self.loss_mask_sum = 0
 
@@ -276,7 +282,7 @@ class HistogramLoss(nn.Module):
     def forward(self, input):
         if self.mode == 'loss':
             corr_fm = self.remap_histogram(input) # (channel, N)
-            self.loss = self.weight * self.critertain(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) 
+            self.loss = self.weight * F.mse_loss(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / input.nelement()
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
@@ -346,7 +352,7 @@ class StyleLossPass1(nn.Module):
         self.stride = stride
         self.device = device
         self.dtype = dtype
-        self.critertain = nn.MSELoss()
+        #self.critertain = nn.MSELoss()
         self.gram = GramMatrix()
         self.mode = 'None'
 
@@ -382,7 +388,7 @@ class StyleLossPass1(nn.Module):
             # Compute Gram Matrix 
             print('StyleLoss Compute Gram Matrix')
             #self.G = self.gram(torch.mul(correspond_fm, self.loss_mask)) / torch.sum(self.loss_mask)
-            self.G = self.gram(torch.mul(correspond_fm, self.loss_mask)) / self.loss_mask_sum 
+            self.G = self.gram(torch.mul(correspond_fm, self.loss_mask))
             self.target = self.G.detach()
 
             del self.content_fm
@@ -393,8 +399,8 @@ class StyleLossPass1(nn.Module):
             # self.G = self.gram(input)
             # self.G = self.G / input.nelement()
             # self.loss = self.critertain(self.G, self.target) * self.weight
-            self.G = self.gram(torch.mul(input, self.loss_mask)) / self.loss_mask_sum 
-            self.loss = self.critertain(self.G, self.target) * self.weight
+            self.G = self.gram(torch.mul(input, self.loss_mask)) 
+            self.loss = F.mse_loss(self.G, self.target) / self.loss_mask_sum * self.weight
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''
@@ -529,8 +535,7 @@ class StyleLossPass2(StyleLossPass1):
             self.ref_corr, self.style_fm_matched = self.match_fm_ref(style_fm, self.content_fm)
 
             # Compute Gram Matrix
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / self.loss_mask_sum
+            self.target_gram = self.gram(torch.mul(self.style_fm_matched, self.loss_mask))
 
         # Step 3: Capture Style Feature Map & Compute Match & Compute Gram for other layers
         elif self.mode == 'capture_style_others':
@@ -541,13 +546,12 @@ class StyleLossPass2(StyleLossPass1):
             style_fm = input.detach()
             _, _, curr_H, curr_W = input.shape
             _, self.style_fm_matched = self.upsample_corr(self.ref_corr, curr_H, curr_W, style_fm)
-            style_fm_matched_masked = torch.mul(self.style_fm_matched, self.loss_mask)
-            self.target_gram = self.gram(style_fm_matched_masked) / torch.sum(self.loss_mask)
+            self.target_gram = self.gram(torch.mul(self.style_fm_matched, self.loss_mask)) 
 
         # Step 4 : during updateing image
         elif self.mode == 'loss':
-            self.img_gram = self.gram(torch.mul(input, self.loss_mask)) / self.loss_mask_sum
-            self.loss = self.critertain(self.img_gram, self.target_gram) * self.weight
+            self.img_gram = self.gram(torch.mul(input, self.loss_mask)) 
+            self.loss = F.mse_loss(self.img_gram, self.target_gram) * self.weight / self.loss_mask_sum
 
         return input
 

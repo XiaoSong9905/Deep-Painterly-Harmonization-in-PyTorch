@@ -64,7 +64,7 @@ def get_args():
                         default=512)
 
     # Training Parameter
-#    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam') # lbfgs currently not support 
+    parser.add_argument("-optim", choices=['lbfgs', 'adam'], default='adam') # lbfgs currently not support 
     parser.add_argument("-lr", type=float, default=1e0)
     parser.add_argument("-n_iter", type=int, default=1000)
     parser.add_argument("-print_interval", type=int, default=150) 

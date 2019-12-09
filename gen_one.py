@@ -41,7 +41,7 @@ elif pass12 == 2:
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \
-        ' -histogram_weight 1 ' \
+        ' -histogram_weight 1e2 ' \
         ' -print_interval 100 -save_img_interval 100  ' \
         ' -verbose '
 

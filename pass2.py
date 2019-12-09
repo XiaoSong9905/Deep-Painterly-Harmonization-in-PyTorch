@@ -60,6 +60,10 @@ def capture_fm_pass2(content_loss_list, style_loss_list, tv_loss_list, histogram
     time_elapsed = time.time() - start_time
     print('@ Time Spend : {:.04f} m {:.04f} s'.format(time_elapsed // 60, time_elapsed % 60))
 
+    # release memory 
+    for i in style_loss_list:
+        del i.style_fm_matched
+
     # reset the model to loss mode for update
     for i in content_loss_list:
         i.mode = 'loss'

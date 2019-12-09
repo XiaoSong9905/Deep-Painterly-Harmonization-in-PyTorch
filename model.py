@@ -142,7 +142,7 @@ class ContentLoss(nn.Module):
             self.content_fm_masked = input.detach()
             self.content_fm_masked = torch.mul(self.content_fm_masked, self.loss_mask)
             self.loss_mask_sum = torch.sum(self.loss_mask) * self.content_fm_masked.shape[1]
-            print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm.shape)))
+            print('ContentLoss content feature map with shape {} captured'.format(str(self.content_fm_masked.shape)))
 
             # Update Mask Size after feature map is captured 
             #self.loss_mask = self.loss_mask.expand_as(self.content_fm)  # 1 * 1 * H * W -> 1 * C * H * W

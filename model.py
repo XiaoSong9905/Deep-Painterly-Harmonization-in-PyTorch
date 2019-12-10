@@ -294,16 +294,16 @@ class HistogramLoss(nn.Module):
             self.loss = self.weight * F.mse_loss(self.corr_fm, torch.mul(input.cpu(), self.tight_mask).reshape((input.shape[1], -1)))
             self.loss = self.loss.to(self.device) * input.nelement() / self.loss_mask_sum 
 
-            def backward_variable_gradient_mask_hook_fn(grad):
-                '''
-                    Functionality : 
-                        Return Gradient only over masked region
-                    Notice : 
-                        Variable hook is used in this case, Module hook is not supported for `complex moule` 
-                '''
-                return torch.mul(grad, self.tight_mask.to(self.device))
-
-            input.register_hook(backward_variable_gradient_mask_hook_fn)
+            #def backward_variable_gradient_mask_hook_fn(grad):
+            #    '''
+            #        Functionality : 
+            #            Return Gradient only over masked region
+            #        Notice : 
+            #            Variable hook is used in this case, Module hook is not supported for `complex moule` 
+            #    '''
+            #    return torch.mul(grad, self.tight_mask.to(self.device))
+            #
+            #input.register_hook(backward_variable_gradient_mask_hook_fn)
 
         return input
 

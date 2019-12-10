@@ -301,7 +301,7 @@ class HistogramLoss(nn.Module):
                     Notice : 
                         Variable hook is used in this case, Module hook is not supported for `complex moule` 
                 '''
-                return torch.mul(grad, self.tight_mask)
+                return torch.mul(grad, self.tight_mask.to(self.device))
 
             input.register_hook(backward_variable_gradient_mask_hook_fn)
 

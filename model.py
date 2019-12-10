@@ -253,15 +253,12 @@ class HistogramLoss(nn.Module):
             optim_img_fm : feature map of the optimized image 
         '''
         # Only Use the masked region & reshape to (channel, N)
-        optim_img_fm = torch.mul(optim_img_fm, self.tight_mask).reshape((optim_img_fm.shape[1], -1))
+        optim_img_fm = torch.mul(optim_img_fm.cpu(), self.tight_mask.cpu()).reshape((optim_img_fm.shape[1], -1))
         C, N = optim_img_fm.shape
 
         # Sort feature map & remember corresponding index for each channel 
         sort_fm, sort_idx = optim_img_fm.sort(1)
         channel_min, channel_max = optim_img_fm.min(1)[0].unsqueeze(1), optim_img_fm.max(1)[0].unsqueeze(1)
-        del optim_img_fm
-        import gc
-        gc.collect()
 
         step = (channel_max - channel_min) / self.n_bins
         rng  = torch.arange(1, N+1).unsqueeze(0).to(self.device)
@@ -286,18 +283,15 @@ class HistogramLoss(nn.Module):
         #_, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
 
-        return optim_img_corr_fm 
+        return optim_img_corr_fm.to(self.device)
 
     def forward(self, input):
         if self.mode == 'loss':
             if self.count % 10 == 0:
-                corr_fm = self.remap_histogram(input) # (channel, N)
-                self.corr_fm = corr_fm
-                self.count = 0
-            else:
-                corr_fm = self.corr_fm
-                self.count = self.count + 1 
-            self.loss = self.weight * F.mse_loss(corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / input.nelement()
+                self.corr_fm = self.remap_histogram(input) # (channel, N)
+            self.count = self.count + 1 
+
+            self.loss = self.weight * F.mse_loss(self.corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) / input.nelement()
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''

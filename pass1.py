@@ -108,7 +108,7 @@ TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(
                 h_loss += i.loss.to(device)
 
         total_loss = s_loss + c_loss + tv_loss + h_loss 
-        total_loss.backward()
+        total_loss.backward(retain_graph=True)
 
         # Only update img over masked region 
         img.grad = torch.mul(img.grad, loss_mask.expand_as(img))

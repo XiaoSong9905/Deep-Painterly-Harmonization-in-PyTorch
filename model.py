@@ -220,6 +220,7 @@ class HistogramLoss(nn.Module):
         #self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
         #self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched) #.contiguous()
         self.loss_mask_sum = torch.sum(self.tight_mask) * self.style_fm_matched.shape[1]
+        self.tight_mask = self.tight_mask.cpu()
 
         style_fm_matched_masked = torch.mul(self.style_fm_matched, self.tight_mask)
                 
@@ -251,7 +252,7 @@ class HistogramLoss(nn.Module):
             optim_img_fm : feature map of the optimized image 
         '''
         # Only Use the masked region & reshape to (channel, N)
-        optim_img_fm = torch.mul(optim_img_fm.cpu(), self.tight_mask.cpu()).reshape((optim_img_fm.shape[1], -1))
+        optim_img_fm = torch.mul(optim_img_fm.cpu(), self.tight_mask).reshape((optim_img_fm.shape[1], -1))
         C, N = optim_img_fm.shape
 
         # Sort feature map & remember corresponding index for each channel 
@@ -281,15 +282,16 @@ class HistogramLoss(nn.Module):
         #_, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
 
-        return optim_img_corr_fm.to(self.device)
+        return optim_img_corr_fm#.to(self.device)
 
     def forward(self, input):
         if self.mode == 'loss':
-            if self.count % 10 == 0:
-                self.corr_fm = self.remap_histogram(input) # (channel, N)
+            if self.count % 50 == 0:
+                self.corr_fm = self.remap_histogram(input) # (channel, N) on cpu
             self.count = self.count + 1 
 
-            self.loss = self.weight * F.mse_loss(self.corr_fm, torch.mul(input, self.tight_mask).reshape((input.shape[1], -1))) * input.nelement() / self.loss_mask_sum 
+            self.loss = self.weight * F.mse_loss(self.corr_fm, torch.mul(input.cpu(), self.tight_mask).reshape((input.shape[1], -1)))
+            self.loss = self.loss.to(self.device) * input.nelement() / self.loss_mask_sum 
 
             def backward_variable_gradient_mask_hook_fn(grad):
                 '''

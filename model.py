@@ -267,7 +267,7 @@ class HistogramLoss(nn.Module):
         style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])        
         style_his_cdf = style_his.cumsum(1) # torch.Size([channel, 256])
         del style_his 
-        style_his_cdf_prev = torch.cat([torch.zeros(C,1).to(self.device), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
+        style_his_cdf_prev = torch.cat([torch.zeros(C,1), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
 
         # Find Corresponding 
         idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).long() # index need long tensor 

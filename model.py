@@ -220,10 +220,11 @@ class HistogramLoss(nn.Module):
         #self.loss_mask = self.loss_mask.expand_as(self.style_fm_matched).contiguous()
         #self.tight_mask = self.tight_mask.expand_as(self.style_fm_matched) #.contiguous()
         self.loss_mask_sum = torch.sum(self.tight_mask) * self.style_fm_matched.shape[1]
-        self.tight_mask = self.tight_mask.cpu()
 
         style_fm_matched_masked = torch.mul(self.style_fm_matched, self.tight_mask)
-                
+        
+        self.tight_mask = self.tight_mask.cpu()
+
         # Compute Histogram per channel of feature map (channel, 256)
         self.style_his = torch.cat([torch.histc(style_fm_matched_masked[:, c, :, :], self.n_bins).unsqueeze(0) for c in range(style_fm_matched_masked.shape[1]) ])
         self.style_his = self.style_his.to(self.device) # style_his is the histogram of matched style image feature map over the masked region 

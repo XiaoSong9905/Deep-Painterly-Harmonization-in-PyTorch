@@ -255,42 +255,44 @@ class HistogramLoss(nn.Module):
         # Only Use the masked region & reshape to (channel, N)
         optim_img_fm = torch.mul(optim_img_fm.cpu(), self.tight_mask).reshape((optim_img_fm.shape[1], -1))
         C, N = optim_img_fm.shape
-
+        import pdb; pdb.set_trace()
         # Sort feature map & remember corresponding index for each channel 
         sort_fm, sort_idx = optim_img_fm.sort(1)
         channel_min, channel_max = optim_img_fm.min(1)[0].unsqueeze(1), optim_img_fm.max(1)[0].unsqueeze(1)
 
         step = (channel_max - channel_min) / self.n_bins
         rng  = torch.arange(1, N+1).unsqueeze(0) #.to(self.device)
-
+        import pdb; pdb.set_trace()
         # Since style histogran not nessary have same number of N, scale it 
         style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])        
+        import pdb; pdb.set_trace()
         style_his_cdf = style_his.cumsum(1) # torch.Size([channel, 256])
         del style_his 
         style_his_cdf_prev = torch.cat([torch.zeros(C,1), style_his_cdf[:,:-1]],1) # torch.Size([channel, 256])
-
+        import pdb; pdb.set_trace()
         # Find Corresponding 
         idx = (style_his_cdf.unsqueeze(1) - rng.unsqueeze(2) < 0).sum(2).long() # index need long tensor 
         ratio = (rng - self.select_idx(style_his_cdf_prev, idx)) / (1e-8 + self.select_idx(style_his_cdf, idx))
         del style_his_cdf_prev
         del style_his_cdf
         ratio = ratio.squeeze().clamp(0,1)
-
+        import pdb; pdb.set_trace()
         # Build Correspponding FM 
         optim_img_corr_fm = channel_min + (ratio + idx) * step
         del ratio
         optim_img_corr_fm[:, -1] = channel_max[:, 0]
         #_, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
-
+        import pdb; pdb.set_trace()
         return optim_img_corr_fm#.to(self.device)
 
     def forward(self, input):
         if self.mode == 'loss':
             if self.count % 50 == 0:
+                import pdb; pdb.set_trace()
                 self.corr_fm = self.remap_histogram(input) # (channel, N) on cpu
             self.count = self.count + 1 
-
+            import pdb; pdb.set_trace()
             self.loss = self.weight * F.mse_loss(self.corr_fm, torch.mul(input.cpu(), self.tight_mask).reshape((input.shape[1], -1)))
             self.loss = self.loss.to(self.device) * input.nelement() / self.loss_mask_sum 
 

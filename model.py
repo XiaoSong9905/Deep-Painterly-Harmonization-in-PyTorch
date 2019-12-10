@@ -227,7 +227,7 @@ class HistogramLoss(nn.Module):
 
         # Compute Histogram per channel of feature map (channel, 256)
         self.style_his = torch.cat([torch.histc(style_fm_matched_masked[:, c, :, :], self.n_bins).unsqueeze(0) for c in range(style_fm_matched_masked.shape[1]) ])
-        self.style_his = self.style_his.to(self.device) # style_his is the histogram of matched style image feature map over the masked region 
+        self.style_his = self.style_his.cpu()#to(self.device) # style_his is the histogram of matched style image feature map over the masked region 
 
         # Delete unused to save memory 
         del style_fm_matched_masked
@@ -261,7 +261,7 @@ class HistogramLoss(nn.Module):
         channel_min, channel_max = optim_img_fm.min(1)[0].unsqueeze(1), optim_img_fm.max(1)[0].unsqueeze(1)
 
         step = (channel_max - channel_min) / self.n_bins
-        rng  = torch.arange(1, N+1).unsqueeze(0).to(self.device)
+        rng  = torch.arange(1, N+1).unsqueeze(0) #.to(self.device)
 
         # Since style histogran not nessary have same number of N, scale it 
         style_his = self.style_his * N / self.style_his.sum(1).unsqueeze(1) # torch.Size([channel, 256])        

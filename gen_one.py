@@ -7,10 +7,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-idx", type=int, default=0)
 parser.add_argument("-p", type=int, default=2)
 parser.add_argument("-size", type=int, default=712)
+parser.add_argument("-n", type=int, default=1000)
 cfg = parser.parse_args()
 idx = cfg.idx
 pass12 = cfg.p
 size = cfg.size
+n_iter = cfg.n 
 
 if not os.path.exists('output'):
     os.mkdir('output')
@@ -25,7 +27,7 @@ if pass12 == 1:
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_inter_res.jpg'\
         ' -output_img_size ' + str(size) + ' ' \
-        ' -n_iter 3000 ' \
+        ' -n_iter ' + str(n_iter) + ' ' \
         ' -lr 3e-1 ' \
         ' -print_interval 100 -save_img_interval 10 '\
         ' -verbose '
@@ -39,7 +41,7 @@ elif pass12 == 2:
         ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
-        ' -n_iter 3000 ' \
+        ' -n_iter ' + str(n_iter) + ' ' \
         ' -lr 3e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \

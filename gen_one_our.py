@@ -31,7 +31,7 @@ if pass12 == 1:
         ' -output_img    outputour/' + str(idx) + pre + '_inter_res.jpg'\
         ' -output_img_size ' + str(size) + ' ' \
         ' -n_iter ' + str(n_iter) + ' ' \
-        ' -lr 10 ' \
+        ' -lr 1 ' \
         ' -match_patch_size ' + str(patch) + ' '\
         ' -print_interval 100 -save_img_interval 10 '\
         ' -verbose '

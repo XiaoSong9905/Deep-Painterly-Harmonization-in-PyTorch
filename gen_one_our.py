@@ -7,10 +7,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-idx", type=int, default=0)
 parser.add_argument("-p", type=int, default=2)
 parser.add_argument("-size", type=int, default=512)
+parser.add_argument("-patch", type=int, default=6)
 cfg = parser.parse_args()
 idx = cfg.idx
 pass12 = cfg.p
 size = cfg.size
+patch = cfg.patch
 
 if not os.path.exists('outputour'):
     os.mkdir('outputour')
@@ -29,6 +31,7 @@ if pass12 == 1:
         ' -output_img_size ' + str(size) + ' ' \
         ' -n_iter 3000 ' \
         ' -lr 3e-1 ' \
+        ' -match_patch_size ' + str(patch) + ' '\
         ' -print_interval 100 -save_img_interval 10 '\
         ' -verbose '
 elif pass12 == 2:

@@ -24,7 +24,7 @@ if pass12 == 1:
         ' -tight_mask    ourdata/' + str(idx) + pre + '_c_mask.png '\
         ' -dilated_mask  ourdata/' + str(idx) + pre + '_c_mask_dilated.png '\
         ' -inter_image   ourdata/inter_dummy.jpg' \
-        ' -gpu cpu ' \
+        ' -gpu 0 ' \
         ' -output_img    outputour/' + str(idx) + pre + '_inter_res.jpg'\
         ' -output_img_size ' + str(size) + ' ' \
         ' -n_iter 3000 ' \

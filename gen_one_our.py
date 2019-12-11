@@ -29,7 +29,7 @@ if pass12 == 1:
         ' -gpu 0 ' \
         ' -output_img    outputour/' + str(idx) + pre + '_inter_res.jpg'\
         ' -output_img_size ' + str(size) + ' ' \
-        ' -n_iter 3000 ' \
+        ' -n_iter 4000 ' \
         ' -lr 3e-1 ' \
         ' -match_patch_size ' + str(patch) + ' '\
         ' -print_interval 100 -save_img_interval 10 '\

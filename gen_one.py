@@ -6,7 +6,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-idx", type=int, default=0)
 parser.add_argument("-p", type=int, default=2)
-parser.add_argument("-size", type=int, default=512)
+parser.add_argument("-size", type=int, default=712)
 cfg = parser.parse_args()
 idx = cfg.idx
 pass12 = cfg.p
@@ -36,7 +36,7 @@ elif pass12 == 2:
         ' -tight_mask    data/' + str(idx) + '_c_mask.jpg '\
         ' -dilated_mask  data/' + str(idx) + '_c_mask_dilated.jpg '\
         ' -inter_image   output/' + str(idx) + '_inter_res.jpg' \
-        ' -gpu cpu ' \
+        ' -gpu 0 ' \
         ' -output_img    output/' + str(idx) + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
         ' -n_iter 3000 ' \

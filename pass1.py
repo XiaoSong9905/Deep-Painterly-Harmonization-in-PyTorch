@@ -69,7 +69,6 @@ TV Loss {:.06f}; Histogram Loss {:.06f}'.format(i_iter, total_loss, c_loss.item(
                 filename = str(output_filename) + str(file_extension)
             else:
                 filename = str(output_filename) + "_iter_{:06d}".format(i_iter) + str(file_extension)
-
             img_deprocessed = img_deprocess(img.clone())
             img_deprocessed.save(str(filename))
     

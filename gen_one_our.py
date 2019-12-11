@@ -8,12 +8,13 @@ parser.add_argument("-idx", type=int, default=0)
 parser.add_argument("-p", type=int, default=2)
 parser.add_argument("-size", type=int, default=512)
 parser.add_argument("-patch", type=int, default=6)
+parser.add_argument("-n", type=int, default=1000)
 cfg = parser.parse_args()
 idx = cfg.idx
 pass12 = cfg.p
 size = cfg.size
 patch = cfg.patch
-
+n_iter = cfg.n
 if not os.path.exists('outputour'):
     os.mkdir('outputour')
 
@@ -29,7 +30,7 @@ if pass12 == 1:
         ' -gpu 0 ' \
         ' -output_img    outputour/' + str(idx) + pre + '_inter_res.jpg'\
         ' -output_img_size ' + str(size) + ' ' \
-        ' -n_iter 3000 ' \
+        ' -n_iter ' + str(n_iter) + ' ' \
         ' -lr 10 ' \
         ' -match_patch_size ' + str(patch) + ' '\
         ' -print_interval 100 -save_img_interval 10 '\
@@ -44,7 +45,7 @@ elif pass12 == 2:
         ' -gpu 0 ' \
         ' -output_img    outputour/' + str(idx) + pre + '_final_res.jpg'\
         ' -output_img_size ' + str(size) + ' '\
-        ' -n_iter 3000 ' \
+        ' -n_iter ' + str(n_iter) + ' ' \
         ' -lr 3e-1 ' \
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \

@@ -3,3 +3,4 @@ models/*.pth
 .ipynb_checkpoints/
 .vscode
 loss_history.png
+.DS_Store

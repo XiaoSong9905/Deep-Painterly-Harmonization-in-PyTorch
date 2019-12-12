@@ -588,8 +588,7 @@ class StyleLossPass2(StyleLossPass1):
         ref_w = style_fm.shape[3]  # width of the reference layer
         n_patch_h = math.floor(ref_h / stride)  # the number of patches along height
         n_patch_w = math.floor(ref_w / stride)  # the number of patches along width
-        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding])  # TODO delete mode='reflect'
-        # padding_img_fm = F.pad(img_fm, [padding, padding, padding, padding]) # TODO delete mode='reflect'
+        padding_style_fm = F.pad(style_fm, [padding, padding, padding, padding], mode='reflect') # original paper use 0 pad, reflect pad make more sense in reality 
 
         # nearest neighbor index for ref_layer: H_ref * W_ref, same as P_out in paper
         ref_corr = np.zeros((ref_h, ref_w))  # Output
@@ -659,9 +658,7 @@ class StyleLossPass2(StyleLossPass1):
         for i in range(n_patch_h):
             for j in range(n_patch_w):
                 # Find matched index in style fm
-                matched_style_idx = (int(ref_corr[i, j]) // ref_w, int(ref_corr[i, j]) % ref_w)
-                #  1 * C * 3 * 3
-                # TODO MAYBE WRONG 
+                matched_style_idx = (int(ref_corr[i, j]) // ref_w, int(ref_corr[i, j]) % ref_w) #  1 * C * 3 * 3
                 style_fm_matched[:, :, i, j] = style_fm[:, :, matched_style_idx[0], matched_style_idx[1]]
 
         return ref_corr.astype(np.int), style_fm_matched

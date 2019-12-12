@@ -1,0 +1,7 @@
+__pycache__/
+models/*.pth
+.ipynb_checkpoints/
+.vscode
+output/*_iter_*.jpg
+download_model_weight/*.pth
+

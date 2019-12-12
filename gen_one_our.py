@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-idx", type=int, default=0)
 parser.add_argument("-p", type=int, default=2)
 parser.add_argument("-size", type=int, default=512)
-parser.add_argument("-patch", type=int, default=6)
+parser.add_argument("-patch", type=int, default=5)
 parser.add_argument("-n", type=int, default=1000)
 cfg = parser.parse_args()
 idx = cfg.idx
@@ -50,7 +50,7 @@ elif pass12 == 2:
         ' -style_layers relu1_1,relu2_1,relu3_1,relu4_1 '\
         ' -content_layers relu4_1 ' \
         ' -histogram_layers relu1_1,relu4_1 ' \
-        ' -histogram_weight 1' \
+        ' -histogram_weight 0' \
         ' -style_weight 1e-4 ' \
         ' -content_weight 3e-1 ' \
         ' -tv_weight 0.005 '\

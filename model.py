@@ -281,7 +281,7 @@ class HistogramLoss(nn.Module):
         optim_img_corr_fm = channel_min + (ratio + idx) * step
         del ratio
         optim_img_corr_fm[:, -1] = channel_max[:, 0]
-        #_, remap = sort_idx.sort()
+        _, remap = sort_idx.sort()
         optim_img_corr_fm = self.select_idx(optim_img_corr_fm, idx)   
          
         return optim_img_corr_fm#.to(self.device)

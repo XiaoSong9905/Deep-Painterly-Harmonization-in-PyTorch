@@ -4,4 +4,5 @@ models/*.pth
 .vscode
 output/*_iter_*.jpg
 download_model_weight/*.pth
+.DS_Store
 

@@ -3,3 +3,6 @@ models/*.pth
 .ipynb_checkpoints/
 .vscode
 loss_history.png
+output/*_iter_*.jpg
+.idea/*
+download_model_weight/*.pth

@@ -1,9 +1,6 @@
 # Deep Painterly Harmonization in PyTorch
 
-> EECS 442 Final Project at University of Michigan, Ann Arbor
-> 
 > Reimplementation of paper `Deep Painterly Harmonization` 
-
 
 
 Pytorch implementation of paper "[Deep Painterly Harmonization](https://arxiv.org/abs/1804.03189)"  
@@ -13,29 +10,6 @@ Official code written in Torch and lua can be found here [Github Link](https://g
 
 This PyTorch implementation follow the structure of [Neural Style Pt Github Link](https://github.com/jcjohnson/neural-style)
 
-
-
-**Pass1 of update is finished, try it out**
-
-**Pass2 of update have not yet finish and still under active development**
-
-
-
-## TODO
-
-23. what's left to do : 如何解决noise， 一个段落 [DONE]
-
-24. Histogram Loss 
-
-25. Pass2 跑数据
-
-26. 完成poster，打印poster
-
-27. Final Report 
-
-28. 非论文的数据
-
-19. 给模型缩水,不需要的层最后就不增加了
 
 ## Requirement
 
